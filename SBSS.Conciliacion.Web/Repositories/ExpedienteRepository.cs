@@ -1,10 +1,7 @@
-using System.Data;
-using Dapper;
 using SBSS.Conciliacion.Web.Data;
 using SBSS.Conciliacion.Web.Models;
 
 namespace SBSS.Conciliacion.Web.Repositories;
-
 
 public class ExpedienteRepository : IExpedienteRepository
 {
@@ -15,58 +12,43 @@ public class ExpedienteRepository : IExpedienteRepository
     public async Task<int> InsertarAsync(CrearExpedienteVm vm)
     {
         using var conn = _factory.CreateConnection();
-
-        var parametros = new DynamicParameters();
-        parametros.Add("@numeroExpediente", vm.NumeroExpediente);
-        parametros.Add("@idTrabajador", vm.IdTrabajador);
-        parametros.Add("@idSede", vm.IdSede);
-        parametros.Add("@fechaRecepcion", vm.FechaRecepcion);
-        parametros.Add("@plazoDias", vm.PlazoDias);
-        parametros.Add("@idExpedienteNuevo", dbType: DbType.Int32, direction: ParameterDirection.Output);
-
-        await conn.ExecuteAsync(
+        return await conn.ScalarProcAsync<int>(
             "sp_Expediente_Insertar",
-            parametros,
-            commandType: CommandType.StoredProcedure);
-
-        return parametros.Get<int>("@idExpedienteNuevo");
+            new
+            {
+                numeroExpediente = vm.NumeroExpediente,
+                idTrabajador = vm.IdTrabajador,
+                idSede = vm.IdSede,
+                fechaRecepcion = vm.FechaRecepcion,
+                plazoDias = vm.PlazoDias
+            });
     }
 
     public async Task<int> AsignarConciliadorAleatorioAsync(int idExpediente)
     {
         using var conn = _factory.CreateConnection();
-
-        var parametros = new DynamicParameters();
-        parametros.Add("@idExpediente", idExpediente);
-        parametros.Add("@idConciliadorAsignado", dbType: DbType.Int32, direction: ParameterDirection.Output);
-
-        await conn.ExecuteAsync("sp_Expediente_AsignarConciliadorAleatorio", parametros, commandType: CommandType.StoredProcedure);
-        return parametros.Get<int>("@idConciliadorAsignado");
+        return await conn.ScalarProcAsync<int>("sp_Expediente_AsignarConciliadorAleatorio", new { idExpediente });
     }
 
     public async Task CambiarEstadoAsync(int idExpediente, string nuevoEstado)
     {
         using var conn = _factory.CreateConnection();
-        await conn.ExecuteAsync(
-            "sp_Expediente_CambiarEstado",
-            new { idExpediente, nuevoEstado },
-            commandType: CommandType.StoredProcedure);
+        await conn.ExecProcAsync("sp_Expediente_CambiarEstado", new { idExpediente, nuevoEstado });
     }
 
     public async Task<ExpedienteDetalleVm?> ObtenerPorIdAsync(int idExpediente)
     {
         using var conn = _factory.CreateConnection();
 
-        using var multi = await conn.QueryMultipleAsync(
-            "sp_Expediente_ObtenerPorId",
-            new { idExpediente },
-            commandType: CommandType.StoredProcedure);
-
-        var expediente = await multi.ReadFirstOrDefaultAsync<Expediente>();
+        // En PostgreSQL el SP de 3 result sets se separó en 3 funciones.
+        var expediente = await conn.QueryFirstOrDefaultProcAsync<Expediente>(
+            "sp_Expediente_ObtenerPorId", new { idExpediente });
         if (expediente is null) return null;
 
-        var personas = (await multi.ReadAsync<PersonaExpedienteVm>()).ToList();
-        var materias = (await multi.ReadAsync<MateriaExpedienteVm>()).ToList();
+        var personas = (await conn.QueryProcAsync<PersonaExpedienteVm>(
+            "sp_Expediente_ObtenerParticipantes", new { idExpediente })).ToList();
+        var materias = (await conn.QueryProcAsync<MateriaExpedienteVm>(
+            "sp_Expediente_ObtenerMaterias", new { idExpediente })).ToList();
 
         return new ExpedienteDetalleVm
         {
@@ -79,8 +61,7 @@ public class ExpedienteRepository : IExpedienteRepository
     public async Task<IEnumerable<ExpedienteListItemVm>> ListarAsync(ExpedienteFiltroVm filtro)
     {
         using var conn = _factory.CreateConnection();
-
-        return await conn.QueryAsync<ExpedienteListItemVm>(
+        return await conn.QueryProcAsync<ExpedienteListItemVm>(
             "sp_Expediente_Listar",
             new
             {
@@ -91,35 +72,28 @@ public class ExpedienteRepository : IExpedienteRepository
                 pagina = filtro.Pagina,
                 tamanioPagina = filtro.TamanioPagina,
                 idMateria = filtro.IdMateria
-
-            },
-            commandType: CommandType.StoredProcedure);
+            });
     }
 
     public async Task AgregarPersonaAsync(AgregarPersonaExpedienteVm vm)
     {
         using var conn = _factory.CreateConnection();
-        await conn.ExecuteAsync(
+        await conn.ExecProcAsync(
             "sp_DetallePersonaExpediente_Agregar",
-            new { idExpediente = vm.IdExpediente, idPersona = vm.IdPersona, rolParticipante = vm.RolParticipante },
-            commandType: CommandType.StoredProcedure);
+            new { idExpediente = vm.IdExpediente, idPersona = vm.IdPersona, rolParticipante = vm.RolParticipante });
     }
 
     public async Task AgregarMateriaAsync(AgregarMateriaExpedienteVm vm)
     {
         using var conn = _factory.CreateConnection();
-        await conn.ExecuteAsync(
+        await conn.ExecProcAsync(
             "sp_DetalleMateriaExpediente_Agregar",
-            new { idExpediente = vm.IdExpediente, idMateria = vm.IdMateria, descripcionDtMateria = vm.DescripcionDtMateria },
-            commandType: CommandType.StoredProcedure);
+            new { idExpediente = vm.IdExpediente, idMateria = vm.IdMateria, descripcionDtMateria = vm.DescripcionDtMateria });
     }
 
     public async Task EliminarAsync(int idExpediente)
     {
         using var conn = _factory.CreateConnection();
-        await conn.ExecuteAsync(
-            "sp_Expediente_Eliminar",
-            new { idExpediente },
-            commandType: CommandType.StoredProcedure);
+        await conn.ExecProcAsync("sp_Expediente_Eliminar", new { idExpediente });
     }
 }

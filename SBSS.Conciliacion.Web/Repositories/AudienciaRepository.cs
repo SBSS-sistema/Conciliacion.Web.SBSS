@@ -1,5 +1,3 @@
-using System.Data;
-using Dapper;
 using SBSS.Conciliacion.Web.Data;
 using SBSS.Conciliacion.Web.Models;
 
@@ -14,28 +12,23 @@ public class AudienciaRepository : IAudienciaRepository
     public async Task<int> ProgramarAsync(ProgramarAudienciaVm vm)
     {
         using var conn = _factory.CreateConnection();
-
-        var parametros = new DynamicParameters();
-        parametros.Add("@idExpediente", vm.IdExpediente);
-        parametros.Add("@idTipoDocumentos", vm.IdTipoDocumentos);
-        parametros.Add("@idConciliador", vm.IdConciliador);
-        parametros.Add("@fecha", vm.Fecha);
-        parametros.Add("@hora", vm.Hora);
-        parametros.Add("@numeroSesion", vm.NumeroSesion);
-        parametros.Add("@idAudiencia", dbType: DbType.Int32, direction: ParameterDirection.Output);
-
-        await conn.ExecuteAsync(
+        return await conn.ScalarProcAsync<int>(
             "sp_Audiencia_Programar",
-            parametros,
-            commandType: CommandType.StoredProcedure);
-
-        return parametros.Get<int>("@idAudiencia");
+            new
+            {
+                idExpediente = vm.IdExpediente,
+                idTipoDocumentos = vm.IdTipoDocumentos,
+                idConciliador = vm.IdConciliador,
+                fecha = vm.Fecha,
+                hora = vm.Hora,
+                numeroSesion = vm.NumeroSesion
+            });
     }
 
     public async Task ReprogramarAsync(ReprogramarAudienciaVm vm)
     {
         using var conn = _factory.CreateConnection();
-        await conn.ExecuteAsync(
+        await conn.ExecProcAsync(
             "sp_Audiencia_Reprogramar",
             new
             {
@@ -43,39 +36,31 @@ public class AudienciaRepository : IAudienciaRepository
                 nuevaFecha = vm.NuevaFecha,
                 nuevaHora = vm.NuevaHora,
                 motivo = vm.Motivo
-            },
-            commandType: CommandType.StoredProcedure);
+            });
     }
 
     public async Task RegistrarResultadoAsync(RegistrarResultadoVm vm)
     {
         using var conn = _factory.CreateConnection();
-        await conn.ExecuteAsync(
+        await conn.ExecProcAsync(
             "sp_Audiencia_RegistrarResultado",
             new
             {
                 idDocumento = vm.IdDocumento,
                 resultado = vm.Resultado,
                 observaciones = vm.Observaciones
-            },
-            commandType: CommandType.StoredProcedure);
+            });
     }
 
     public async Task<IEnumerable<AudienciaListItemVm>> ListarPorExpedienteAsync(int idExpediente)
     {
         using var conn = _factory.CreateConnection();
-        return await conn.QueryAsync<AudienciaListItemVm>(
-            "sp_Audiencia_ListarPorExpediente",
-            new { idExpediente },
-            commandType: CommandType.StoredProcedure);
+        return await conn.QueryProcAsync<AudienciaListItemVm>("sp_Audiencia_ListarPorExpediente", new { idExpediente });
     }
 
     public async Task<AudienciaDetalleVm?> ObtenerPorIdAsync(int idDocumento)
     {
         using var conn = _factory.CreateConnection();
-        return await conn.QueryFirstOrDefaultAsync<AudienciaDetalleVm>(
-            "sp_Audiencia_ObtenerPorId",
-            new { idDocumento },
-            commandType: CommandType.StoredProcedure);
+        return await conn.QueryFirstOrDefaultProcAsync<AudienciaDetalleVm>("sp_Audiencia_ObtenerPorId", new { idDocumento });
     }
 }

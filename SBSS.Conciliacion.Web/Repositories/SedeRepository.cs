@@ -1,5 +1,3 @@
-using System.Data;
-using Dapper;
 using SBSS.Conciliacion.Web.Data;
 using SBSS.Conciliacion.Web.Models;
 
@@ -14,49 +12,30 @@ public class SedeRepository : ISedeRepository
     public async Task<int> InsertarAsync(CrearSedeVm vm)
     {
         using var conn = _factory.CreateConnection();
-
-        var parametros = new DynamicParameters();
-        parametros.Add("@nombre", vm.Nombre);
-        parametros.Add("@descripcion", vm.Descripcion);
-        parametros.Add("@idSedeNuevo", dbType: DbType.Int32, direction: ParameterDirection.Output);
-
-        await conn.ExecuteAsync("sp_Sede_Insertar", parametros, commandType: CommandType.StoredProcedure);
-        return parametros.Get<int>("@idSedeNuevo");
+        return await conn.ScalarProcAsync<int>("sp_Sede_Insertar", new { nombre = vm.Nombre, descripcion = vm.Descripcion });
     }
 
     public async Task ActualizarAsync(EditarSedeVm vm)
     {
         using var conn = _factory.CreateConnection();
-        await conn.ExecuteAsync(
-            "sp_Sede_Actualizar",
-            new { idSede = vm.IdSede, nombre = vm.Nombre, descripcion = vm.Descripcion },
-            commandType: CommandType.StoredProcedure);
+        await conn.ExecProcAsync("sp_Sede_Actualizar", new { idSede = vm.IdSede, nombre = vm.Nombre, descripcion = vm.Descripcion });
     }
 
     public async Task CambiarEstadoAsync(int idSede, string estadoSede)
     {
         using var conn = _factory.CreateConnection();
-        await conn.ExecuteAsync(
-            "sp_Sede_CambiarEstado",
-            new { idSede, estadoSede },
-            commandType: CommandType.StoredProcedure);
+        await conn.ExecProcAsync("sp_Sede_CambiarEstado", new { idSede, estadoSede });
     }
 
     public async Task<Sede?> ObtenerPorIdAsync(int idSede)
     {
         using var conn = _factory.CreateConnection();
-        return await conn.QueryFirstOrDefaultAsync<Sede>(
-            "sp_Sede_ObtenerPorId",
-            new { idSede },
-            commandType: CommandType.StoredProcedure);
+        return await conn.QueryFirstOrDefaultProcAsync<Sede>("sp_Sede_ObtenerPorId", new { idSede });
     }
 
     public async Task<IEnumerable<Sede>> ListarAsync(bool soloActivas = false)
     {
         using var conn = _factory.CreateConnection();
-        return await conn.QueryAsync<Sede>(
-            "sp_Sede_Listar",
-            new { soloActivas },
-            commandType: CommandType.StoredProcedure);
+        return await conn.QueryProcAsync<Sede>("sp_Sede_Listar", new { soloActivas });
     }
 }
