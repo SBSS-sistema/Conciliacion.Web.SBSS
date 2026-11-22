@@ -1,0 +1,97 @@
+@{
+    ViewData["Title"] = "Calendario";
+}
+
+@section Styles {
+    <style>
+        .cal-toolbar{display:flex;flex-wrap:wrap;gap:24px;align-items:center;margin-bottom:18px;font-family:'Poppins',sans-serif;font-size:0.88rem;color:var(--navy);}
+        .cal-toolbar label{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;}
+        .cal-leyenda{display:flex;flex-wrap:wrap;gap:16px;margin-left:auto;}
+        .cal-leyenda span{display:inline-flex;align-items:center;gap:6px;font-size:0.8rem;}
+        .cal-leyenda i{width:12px;height:12px;border-radius:3px;display:inline-block;}
+        #calendario{font-family:'Poppins',sans-serif;}
+        #calendario .fc{
+            --fc-button-bg-color:#0c3855;--fc-button-border-color:#0c3855;
+            --fc-button-hover-bg-color:#082639;--fc-button-hover-border-color:#082639;
+            --fc-button-active-bg-color:#082639;--fc-button-active-border-color:#082639;
+            --fc-today-bg-color:rgba(179,137,58,0.12);
+        }
+        #calendario .fc-toolbar-title{font-size:1.25rem;font-weight:700;color:var(--navy);text-transform:capitalize;}
+        #calendario .fc-event{cursor:pointer;font-size:0.78rem;}
+        #cal-error{display:none;}
+    </style>
+}
+
+<div class="wrap page-head">
+    <h1>Calendario de audiencias</h1>
+    <p>Audiencias programadas y vencimientos de expedientes. Haz clic en un evento para abrirlo.</p>
+</div>
+
+<div class="wrap">
+    <div class="panel">
+        <div class="alerta alerta-error" id="cal-error">No se pudo cargar el calendario. Recarga la página e inténtalo de nuevo.</div>
+
+        <div class="cal-toolbar">
+            <label><input type="checkbox" id="chkSoloMias"> Solo mis audiencias</label>
+            <label><input type="checkbox" id="chkVencimientos" checked> Mostrar vencimientos</label>
+            <div class="cal-leyenda">
+                <span><i style="background:#0c3855"></i>Programada</span>
+                <span><i style="background:#b3893a"></i>Reprogramada</span>
+                <span><i style="background:#1f6b3a"></i>Con resultado</span>
+                <span><i style="background:#a4302f"></i>Vencimiento</span>
+            </div>
+        </div>
+
+        <div id="calendario"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales-all.global.min.js"></script>
+    <script>
+        (function () {
+            if (typeof FullCalendar === 'undefined') {
+                document.getElementById('cal-error').style.display = 'block';
+                return;
+            }
+
+            const chkMias = document.getElementById('chkSoloMias');
+            const chkVenc = document.getElementById('chkVencimientos');
+            const aviso = document.getElementById('cal-error');
+
+            const calendar = new FullCalendar.Calendar(document.getElementById('calendario'), {
+                locale: 'es',
+                firstDay: 1,
+                initialView: window.innerWidth < 700 ? 'listMonth' : 'dayGridMonth',
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listMonth' },
+                height: 'auto',
+                nowIndicator: true,
+                slotMinTime: '07:00:00',
+                slotMaxTime: '21:00:00',
+                eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+                dayMaxEvents: 4,
+                events: {
+                    url: '@Url.Action("Eventos", "Calendario")',
+                    extraParams: function () {
+                        return { soloMias: chkMias.checked, vencimientos: chkVenc.checked };
+                    },
+                    failure: function () { aviso.style.display = 'block'; }
+                },
+                loading: function (cargando) { if (cargando) aviso.style.display = 'none'; },
+                eventDidMount: function (info) {
+                    const p = info.event.extendedProps || {};
+                    const partes = [info.event.title];
+                    if (p.conciliador) partes.push('Conciliador: ' + p.conciliador);
+                    if (p.estado) partes.push('Estado: ' + p.estado);
+                    if (p.resultado) partes.push('Resultado: ' + p.resultado);
+                    info.el.title = partes.join('\n');
+                }
+            });
+
+            calendar.render();
+            chkMias.addEventListener('change', function () { calendar.refetchEvents(); });
+            chkVenc.addEventListener('change', function () { calendar.refetchEvents(); });
+        })();
+    </script>
+}

@@ -63,4 +63,18 @@ public class AudienciaRepository : IAudienciaRepository
         using var conn = _factory.CreateConnection();
         return await conn.QueryFirstOrDefaultProcAsync<AudienciaDetalleVm>("sp_Audiencia_ObtenerPorId", new { idDocumento });
     }
+
+    public async Task<IEnumerable<AudienciaCalendarioVm>> ListarPorRangoAsync(DateTime desde, DateTime hasta, int? idConciliador)
+    {
+        using var conn = _factory.CreateConnection();
+        return await conn.QueryProcAsync<AudienciaCalendarioVm>(
+            "sp_Audiencia_ListarRango", new { desde, hasta, idConciliador });
+    }
+
+    public async Task<IEnumerable<VencimientoCalendarioVm>> ListarVencimientosPorRangoAsync(DateTime desde, DateTime hasta, int? idConciliador)
+    {
+        using var conn = _factory.CreateConnection();
+        return await conn.QueryProcAsync<VencimientoCalendarioVm>(
+            "sp_Calendario_Vencimientos", new { desde, hasta, idConciliador });
+    }
 }
