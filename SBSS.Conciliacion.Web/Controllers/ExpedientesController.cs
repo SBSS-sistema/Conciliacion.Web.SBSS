@@ -245,14 +245,13 @@ public class ExpedientesController : Controller
         var archivo = await _documentos.ObtenerArchivoPorIdAsync(id);
         if (archivo is null) return NotFound();
 
-        var rutaFisica = _almacenamiento.ObtenerRutaFisica(archivo.RutaArchivo);
-        if (!System.IO.File.Exists(rutaFisica)) return NotFound();
+        var bytes = await _almacenamiento.LeerAsync(archivo.RutaArchivo);
+        if (bytes is null) return NotFound();
 
         var provider = new FileExtensionContentTypeProvider();
         if (!provider.TryGetContentType(archivo.NombreArchivo, out var contentType))
             contentType = "application/octet-stream";
 
-        var bytes = await System.IO.File.ReadAllBytesAsync(rutaFisica);
         return File(bytes, contentType, archivo.NombreArchivo);
     }
 
