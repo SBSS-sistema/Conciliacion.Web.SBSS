@@ -4,32 +4,39 @@
     Layout = "_Layout";
 }
 
-<section style="min-height:70vh;display:flex;align-items:center;justify-content:center;background:var(--mist);padding:60px 0;">
-    <div class="panel" style="max-width:420px;width:100%;">
-        <div style="text-align:center;margin-bottom:24px;">
-            <img src="~/images/logo-navy.png" alt="Centro de Conciliación Extrajudicial SBSS" style="height:44px;margin:0 auto 18px;">
-            <h1 style="font-size:1.4rem;">Acceso al sistema</h1>
-            <p style="color:#4a5a61;font-size:0.9rem;margin-top:6px;">Gestión de Conciliación SBSS</p>
+<section class="login-shell">
+    <aside class="login-aside">
+        <h2>Gestión de Conciliación SBSS</h2>
+        <p>Registro y seguimiento de expedientes, audiencias y documentos del Centro de Conciliación Extrajudicial.</p>
+        <p class="nota">Sistema de uso interno, conforme a la Ley N.° 26872 y su Reglamento, D.S. N.° 004-2005-JUS.</p>
+    </aside>
+
+    <div class="login-main">
+        <div class="panel">
+            <div style="margin-bottom:24px;">
+                <h1 style="font-size:1.4rem;">Acceso al sistema</h1>
+                <p style="color:var(--muted);font-size:0.9rem;margin:6px 0 0;">Ingresa con tu usuario y contraseña.</p>
+            </div>
+
+            <form asp-controller="Account" asp-action="Login" method="post" class="form-sbss">
+                <input type="hidden" asp-for="ReturnUrl" />
+                <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+                <label asp-for="Usuario">Usuario</label>
+                <input asp-for="Usuario" class="form-control" autofocus />
+                <span asp-validation-for="Usuario" class="text-danger"></span>
+
+                <label asp-for="Contrasenia">Contraseña</label>
+                <input asp-for="Contrasenia" class="form-control" />
+                <span asp-validation-for="Contrasenia" class="text-danger"></span>
+
+                <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;">Ingresar</button>
+            </form>
+
+            <p style="text-align:center;margin:20px 0 0;font-size:0.85rem;">
+                <a asp-controller="Account" asp-action="OlvideContrasenia" style="color:var(--celeste-ink);text-decoration:underline;">¿Olvidaste tu contraseña?</a>
+            </p>
         </div>
-
-        <form asp-controller="Account" asp-action="Login" method="post" class="form-sbss">
-            <input type="hidden" asp-for="ReturnUrl" />
-            <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
-
-            <label asp-for="Usuario">Usuario</label>
-            <input asp-for="Usuario" class="form-control" autofocus />
-            <span asp-validation-for="Usuario" class="text-danger"></span>
-
-            <label asp-for="Contrasenia">Contraseña</label>
-            <input asp-for="Contrasenia" class="form-control" />
-            <span asp-validation-for="Contrasenia" class="text-danger"></span>
-
-            <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;">Ingresar</button>
-        </form>
-
-        <p style="text-align:center;margin-top:20px;font-size:0.85rem;">
-            <a asp-controller="Account" asp-action="OlvideContrasenia" style="color:var(--navy);text-decoration:underline;">¿Olvidaste tu contraseña?</a>
-        </p>
     </div>
 </section>
 

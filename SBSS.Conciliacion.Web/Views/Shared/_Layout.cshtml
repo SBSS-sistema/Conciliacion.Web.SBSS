@@ -1,8 +1,17 @@
+@{
+    var ctrl = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    string Activo(params string[] controladores) =>
+        controladores.Any(c => string.Equals(c, ctrl, StringComparison.OrdinalIgnoreCase)) ? "activo" : "";
+
+    var nombreUsuario = User.Identity?.Name ?? "";
+    var inicial = nombreUsuario.Trim().Length > 0 ? nombreUsuario.Trim().Substring(0, 1).ToUpperInvariant() : "?";
+}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c3855" />
     <title>@ViewData["Title"] - Gestión de Conciliación SBSS</title>
     <link rel="icon" type="image/png" href="~/images/emblem.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,69 +27,45 @@
         @if (User.Identity is { IsAuthenticated: true })
         {
             <a asp-controller="Dashboard" asp-action="Index" class="brand">
-                <img src="~/images/logo-navy.png" alt="Centro de Conciliación Extrajudicial SBSS">
+                <img src="~/images/logo-white.png" alt="Centro de Conciliación Extrajudicial SBSS">
             </a>
-                <nav class="nav-links">
-                    <a asp-controller="Dashboard"
-                       asp-action="Index">
-                        Dashboard
-                    </a>
 
-                    <a asp-controller="Expedientes"
-                       asp-action="Index">
-                        Expedientes
-                    </a>
+            <nav class="nav-links" id="navLinks" aria-label="Principal">
+                <a asp-controller="Dashboard" asp-action="Index" class="@Activo("Dashboard", "Home")">Dashboard</a>
+                <a asp-controller="Expedientes" asp-action="Index" class="@Activo("Expedientes", "Audiencias")">Expedientes</a>
+                <a asp-controller="Calendario" asp-action="Index" class="@Activo("Calendario")">Calendario</a>
+                <a asp-controller="Reportes" asp-action="Index" class="@Activo("Reportes")">Reportes</a>
+                <a asp-controller="Catalogos" asp-action="Index" class="@Activo("Catalogos", "Sedes", "Trabajadores", "Materias", "Personas")">Catálogos</a>
+            </nav>
 
-                    <a asp-controller="Calendario"
-                       asp-action="Index">
-                        Calendario
-                    </a>
+            <div class="nav-cta">
+                <!-- La campana es el enlace a Notificaciones -->
+                <a asp-controller="Notificaciones"
+                   asp-action="Index"
+                   id="btnNotificaciones"
+                   class="bell"
+                   title="Ver notificaciones"
+                   aria-label="Ver notificaciones">
+                    <span aria-hidden="true">🔔</span>
+                    <span id="badgeNotificaciones" class="badge-count" hidden>0</span>
+                </a>
 
-                    <a asp-controller="Reportes"
-                       asp-action="Index">
-                        Reportes
-                    </a>
+                <span class="user-chip">
+                    <span class="avatar" aria-hidden="true">@inicial</span>
+                    <span class="user-nombre">@User.Identity!.Name</span>
+                </span>
 
-                    <a asp-controller="Catalogos"
-                       asp-action="Index">
-                        Catálogos
-                    </a>
-                </nav>
-
-                <div class="nav-cta">
-
-                    <!-- La campana ahora es el enlace a Notificaciones -->
-                    <a asp-controller="Notificaciones"
-                       asp-action="Index"
-                       id="btnNotificaciones"
-                       class="bell"
-                       title="Ver notificaciones"
-                       aria-label="Ver notificaciones">
-
-                        <span aria-hidden="true">🔔</span>
-
-                        <span id="badgeNotificaciones"
-                              class="badge-count"
-                              hidden>
-                            0
-                        </span>
-                    </a>
-
-                    <span class="user-chip">
-                        @User.Identity!.Name
-                    </span>
-
-                    <a asp-controller="Account"
-                       asp-action="Logout"
-                       class="btn btn-ghost">
-                        Cerrar sesión
-                    </a>
+                <a asp-controller="Account" asp-action="Logout" class="btn btn-ghost">Cerrar sesión</a>
             </div>
+
+            <button type="button" class="nav-toggle" id="navToggle" aria-label="Abrir menú" aria-controls="navLinks" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
         }
         else
         {
             <span class="brand">
-                <img src="~/images/logo-navy.png" alt="Centro de Conciliación Extrajudicial SBSS">
+                <img src="~/images/logo-white.png" alt="Centro de Conciliación Extrajudicial SBSS">
             </span>
         }
     </div>
@@ -126,6 +111,18 @@
     </div>
 </footer>
 
+<script>
+    // Menú desplegable en celular
+    (function () {
+        var boton = document.getElementById('navToggle');
+        var cabecera = document.querySelector('.app-header');
+        if (!boton || !cabecera) return;
+        boton.addEventListener('click', function () {
+            var abierto = cabecera.classList.toggle('abierto');
+            boton.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+        });
+    })();
+</script>
 <script src="~/lib/signalr.min.js" asp-append-version="true"></script>
 <script src="~/js/site.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)

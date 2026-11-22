@@ -70,6 +70,9 @@
 @section Scripts {
     <script src="~/lib/chart.umd.js" asp-append-version="true"></script>
     <script>
+        Chart.defaults.font.family = "Poppins, sans-serif";
+        Chart.defaults.color = "#4a5a61";
+
         const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
         // Series ya resueltas en el servidor (Model.PorMes / Model.TasaExito), a partir de
@@ -83,16 +86,35 @@
         const etiquetasResultado = [@Html.Raw(string.Join(",", Model.TasaExito.Select(t => $"'{t.Resultado}'")))];
         const cantidadesResultado = [@string.Join(",", Model.TasaExito.Select(t => t.Cantidad))];
 
+        // Colores con el mismo significado que las etiquetas de estado de las tablas.
+        function colorResultado(etiqueta) {
+            const e = String(etiqueta).toUpperCase();
+            if (e.includes('ACUERDO_TOTAL')) return '#1f6b3a';
+            if (e.includes('ACUERDO_PARCIAL')) return '#1c8c8c';
+            if (e.includes('NO_ACUERDO')) return '#b3893a';
+            if (e.includes('INASISTENCIA_UNA')) return '#3b9bd6';
+            if (e.includes('INASISTENCIA_AMBAS')) return '#5b7a8f';
+            return '#0c3855';
+        }
+
+        const opcionesBarras = {
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#e8eef2' }, border: { display: false } },
+                x: { grid: { display: false } }
+            }
+        };
+
         new Chart(document.getElementById('chartPorMes'), {
             type: 'bar',
             data: {
                 labels: meses,
-                datasets: [{ label: 'Expedientes recibidos', data: cantidadesPorMes, backgroundColor: '#0c3855' }]
+                datasets: [{ label: 'Expedientes recibidos', data: cantidadesPorMes, backgroundColor: '#12507a', borderRadius: 4 }]
             },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            options: opcionesBarras
         });
 
-        // Barras por estado del expediente (a partir del mismo resumen de las tarjetas KPI).
+        // Barras por estado del expediente (a partir del mismo resumen de los indicadores).
         new Chart(document.getElementById('chartPorEstado'), {
             type: 'bar',
             data: {
@@ -106,14 +128,14 @@
                         @Model.Resumen.Concluidos,
                         @Model.Resumen.Archivados
                     ],
-                    backgroundColor: ['#5b6a70', '#0c3855', '#b3893a', '#1f6b3a', '#8a97a0']
+                    backgroundColor: ['#5b7a8f', '#3b9bd6', '#b3893a', '#1f6b3a', '#8a97a0'],
+                    borderRadius: 4
                 }]
             },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            options: opcionesBarras
         });
 
-        // Resultado de audiencias como barras (antes era una dona: las barras
-        // permiten comparar cantidades exactas entre resultados con más claridad).
+        // Resultado de audiencias como barras.
         new Chart(document.getElementById('chartTasaExito'), {
             type: 'bar',
             data: {
@@ -121,10 +143,11 @@
                 datasets: [{
                     label: 'Audiencias',
                     data: cantidadesResultado,
-                    backgroundColor: ['#0c3855','#b3893a','#a4302f','#5b6a70','#1f6b3a']
+                    backgroundColor: etiquetasResultado.map(colorResultado),
+                    borderRadius: 4
                 }]
             },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            options: opcionesBarras
         });
     </script>
 }
