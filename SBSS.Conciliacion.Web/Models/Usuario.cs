@@ -12,6 +12,7 @@ public class UsuarioLogin
     public int IdTrabajador { get; set; }
     public string NombreTrabajador { get; set; } = string.Empty;
     public string ApePaterTrabajador { get; set; } = string.Empty;
+    public string? EmailTrabajador { get; set; }
     public string? EstadoTrabajador { get; set; }
 }
 
@@ -41,6 +42,19 @@ public class LoginVm
     [DataType(DataType.Password)]
     [Display(Name = "Contraseña")]
     public string Contrasenia { get; set; } = string.Empty;
+
+    public string? ReturnUrl { get; set; }
+}
+
+public class VerificarCodigoLoginVm
+{
+    [Required]
+    public Guid DesafioId { get; set; }
+
+    [Required(ErrorMessage = "Ingresa el código de seis dígitos.")]
+    [RegularExpression("^\\d{6}$", ErrorMessage = "El código debe tener seis dígitos.")]
+    [Display(Name = "Código de verificación")]
+    public string Codigo { get; set; } = string.Empty;
 
     public string? ReturnUrl { get; set; }
 }

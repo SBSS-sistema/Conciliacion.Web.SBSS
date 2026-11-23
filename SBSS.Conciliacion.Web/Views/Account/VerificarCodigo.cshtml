@@ -1,0 +1,35 @@
+@model VerificarCodigoLoginVm
+@{
+    ViewData["Title"] = "Verificación de inicio de sesión";
+    Layout = "_Layout";
+}
+
+<section class="login-shell">
+    <aside class="login-aside">
+        <h2>Un paso más para ingresar</h2>
+        <p>Enviamos un código temporal al correo asociado a tu cuenta.</p>
+        <p class="nota">Si no recibes el mensaje, revisa la carpeta de correo no deseado o contacta al administrador.</p>
+    </aside>
+    <div class="login-main">
+        <div class="panel">
+            <div style="margin-bottom:24px;">
+                <h1 style="font-size:1.4rem;">Código de verificación</h1>
+                <p style="color:var(--muted);font-size:0.9rem;margin:6px 0 0;">El código vence en pocos minutos y solo puede usarse una vez.</p>
+            </div>
+            <form asp-controller="Account" asp-action="VerificarCodigo" method="post" class="form-sbss">
+                <input type="hidden" asp-for="DesafioId" />
+                <input type="hidden" asp-for="ReturnUrl" />
+                <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+                <label asp-for="Codigo"></label>
+                <input asp-for="Codigo" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus />
+                <span asp-validation-for="Codigo" class="text-danger"></span>
+                <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Verificar e ingresar</button>
+            </form>
+            <p style="text-align:center;margin:20px 0 0;font-size:0.85rem;">
+                <a asp-controller="Account" asp-action="Login" style="color:var(--celeste-ink);text-decoration:underline;">Volver al inicio de sesión</a>
+            </p>
+        </div>
+    </div>
+</section>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

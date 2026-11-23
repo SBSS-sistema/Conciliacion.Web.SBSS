@@ -39,6 +39,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddSingleton<IDbConnectionFactory>(new SqlConnectionFactory(connectionString));
 
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+builder.Services.AddScoped<ILoginEmailCodeRepository, LoginEmailCodeRepository>();
 builder.Services.AddScoped<ICitaRepository, CitaRepository>();
 builder.Services.AddScoped<IExpedienteRepository, ExpedienteRepository>();
 builder.Services.AddScoped<IAudienciaRepository, AudienciaRepository>();
@@ -61,6 +62,9 @@ builder.Services.AddScoped<IArchivoAlmacenamientoService, ArchivoAlmacenamientoS
 // Decolecta:ApiKey (configurarla con User Secrets o variables de entorno,
 // nunca en appsettings.json en el repositorio).
 builder.Services.AddHttpClient<IDecolectaService, DecolectaService>();
+builder.Services.Configure<SBSS.Conciliacion.Web.Models.EmailLoginCodeOptions>(
+    builder.Configuration.GetSection("Authentication:EmailCode"));
+builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>();
 
 // Job en segundo plano: revisa vencimientos y notifica por SignalR (alternativa a un job de SQL Agent)
 builder.Services.AddHostedService<AlertaVencimientoBackgroundService>();
