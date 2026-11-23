@@ -4,6 +4,7 @@
 @{
     ViewData["Title"] = "Materias";
     var grupos = Model.GroupBy(m => m.NombreTipoMateria ?? "Sin tipo");
+    var esAdministrador = User.IsInRole("ADMINISTRADOR");
 }
 
 <div class="wrap page-head" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;">
@@ -11,10 +12,13 @@
         <h1>Materias</h1>
         <p>Materias conciliables, agrupadas por tipo.</p>
     </div>
-    <div style="display:flex;gap:12px;">
-        <a asp-action="CreateTipo" class="btn btn-ghost">+ Tipo de materia</a>
-        <a asp-action="Create" class="btn btn-primary">+ Materia</a>
-    </div>
+    @if (esAdministrador)
+    {
+        <div style="display:flex;gap:12px;">
+            <a asp-action="CreateTipo" class="btn btn-ghost">+ Tipo de materia</a>
+            <a asp-action="Create" class="btn btn-primary">+ Materia</a>
+        </div>
+    }
 </div>
 
 <div class="wrap">
@@ -27,7 +31,7 @@
         <div class="panel">
             <h3 style="margin-bottom:16px;">@grupo.Key</h3>
             <table class="tabla-sbss">
-                <thead><tr><th>Materia</th><th>Descripción</th><th></th><th></th></tr></thead>
+                <thead><tr><th>Materia</th><th>Descripción</th>@if (esAdministrador) { <th></th><th></th> }</tr></thead>
                 <tbody>
                     @foreach (var m in grupo)
                     {
@@ -36,13 +40,11 @@
                             <td>@m.DescripcionMateria</td>
 
                         
-                            <td>
-                                <button type="button" data-url="@Url.Action("Edit", new { id = m.IdMateria })" class="btn btn-ghost btn-modal" style="padding:6px 14px;">Editar</button>
-                            </td>
-                           
-                            <td>
-                                <button type="button" data-url="@Url.Action("Delete", new { id = m.IdMateria })" class="btn btn-ghost text-danger btn-modal" style="padding:6px 14px;">Eliminar</button>
-                            </td>
+                            @if (esAdministrador)
+                            {
+                                <td><button type="button" data-url="@Url.Action("Edit", new { id = m.IdMateria })" class="btn btn-ghost btn-modal" style="padding:6px 14px;">Editar</button></td>
+                                <td><button type="button" data-url="@Url.Action("Delete", new { id = m.IdMateria })" class="btn btn-ghost text-danger btn-modal" style="padding:6px 14px;">Eliminar</button></td>
+                            }
                         </tr>
                     }
 
@@ -88,5 +90,6 @@
         });
     });
 </script>
+
 
 
