@@ -1,298 +1,3 @@
-# GestiÃ³n de ConciliaciÃ³n SBSS
-
-AplicaciÃ³n web ASP.NET Core 10.0 MVC para la gestiÃ³n de expedientes de
-conciliaciÃ³n extrajudicial del Centro de ConciliaciÃ³n Extrajudicial SBSS
-(Ley N.Â° 26872 y D.S. N.Â° 004-2005-JUS).
-
-## Arquitectura
-
-- **Acceso a datos en Render**: Dapper sobre PostgreSQL de Supabase mediante
-  `Npgsql`. `Data/PgProc.cs` adapta los nombres de RPC `sp_*` que usa la app a
-  funciones PostgreSQL. Citas y administraciÃ³n de roles usan SQL parametrizado
-  contra tablas PostgreSQL.
-- **Scripts SQL heredados**: `BD-SBSS-Completa.sql`, `BD-SBSS-SP.sql`, seed,
-  carga masiva y ubigeo contienen sintaxis T-SQL de SQL Server. Sirven para la
-  instalaciÃ³n SQL Server de desarrollo; **no se ejecutan en Supabase**. No son
-  una exportaciÃ³n del esquema Supabase que ya utiliza Render.
-- **AutenticaciÃ³n**: cookie de ASP.NET Core (`AddCookie`), validando contra
-  `sp_Usuario_ObtenerParaLogin` + `BCrypt.Net` para el hash de contraseÃ±a.
-- **Tiempo real**: `Hubs/NotificacionesHub.cs` (SignalR) + un
-  `BackgroundService` (`AlertaVencimientoBackgroundService`) que revisa
-  vencimientos periÃ³dicamente y llama a `sp_Notificacion_GenerarAlertasVencimiento`.
-- **Documentos**: `.docx` con Open XML SDK (`DocumentoWordService`), Excel con
-  ClosedXML y PDF con QuestPDF â€” todo sin depender de Word/Office instalado
-  en el servidor.
-- **Frontend**: `_Layout.cshtml` + `site.css` reutilizan la paleta y
-  tipografÃ­a del manual de marca del Centro (`#0c3855`, `#e2e5e4`, `#1d1d1b`,
-  Poppins/Lora) y el logo real extraÃ­do de los PDF de marca, en
-  `wwwroot/images`.
-
-## Base de datos y despliegue
-
-El backend actual requiere PostgreSQL y se conecta a la base Supabase ya
-configurada. Para ejecutar localmente, configura `ConnectionStrings:DefaultConnection`
-como secreto de usuario o variable de entorno. La cadena nunca se guarda en Git.
-
-Los scripts `BD-SBSS-Completa.sql`, `BD-SBSS-SP.sql`, `BD-SBSS-Seed.sql`,
-`BD-SBSS-CargaMasiva.sql` y `BD-SBSS-Ubigeo.sql` son artefactos T-SQL del diseÃ±o
-SQL Server original. Se conservan como referencia, pero no crean ni actualizan
-el esquema que consume la aplicaciÃ³n actual en Supabase.
-
-### ProducciÃ³n existente en Render + Supabase
-
-- El backend sigue conectÃ¡ndose con `Npgsql`. Conserva en Render los valores
-  actuales de `ConnectionStrings__DefaultConnection`, `Supabase__Url`,
-  `Supabase__ServiceKey` y `Supabase__Bucket`; este cambio no los reemplaza.
-- La clave de Supabase Storage se queda en variables secretas de Render, nunca
-  en `appsettings.json` ni en GitHub. El servicio existente de Storage no se
-  modifica.
-- No ejecutes los scripts T-SQL heredados en el SQL Editor de Supabase. Para
-  esta funcionalidad, ejecuta una sola vez `Database/06_roles_citas_supabase.sql`
-  en Supabase. Antes de asignar roles, sigue con cuidado las instrucciones de
-  `Database/07_asegurar_administrador_supabase.sql` y confirma que tu cuenta
-  conserve `ADMINISTRADOR`.
-- La rama `feature/roles-citas` es para revisiÃ³n. Render sigue desplegando su
-  rama configurada; estos cambios no llegan a producciÃ³n hasta que tÃº los
-  integres segÃºn tu flujo habitual.
-
-Para desarrollo con el backend Supabase, la cadena de conexiÃ³n local se
-configura como secreto de usuario o variable de entorno, no se guarda en Git.
-
-### Credenciales de ejemplo SQL Server
-
-Las siguientes credenciales las crea el seed SQL Server local; no se asume que
-existan en tu proyecto Supabase:
-
-| Usuario        | ContraseÃ±a           | Rol            |
-|----------------|-----------------------|----------------|
-| `admin`        | `Conciliacion2026!`   | ADMINISTRADOR  |
-| `conciliador1` | `Conciliacion2026!`   | CONCILIADOR    |
-
-Las contraseÃ±as del seed estÃ¡n guardadas como hash BCrypt (factor de costo 11),
-no en texto plano.
-
-<!-- Legacy setup text retained below only as historical reference. -->
-<!-- 2. Ajustar la cadena de conexiÃ³n en `appsettings.Development.json`
-   (`ConnectionStrings:DefaultConnection`).
--->
-
-## Estructura
-
-```
-Controllers/     HomeController, AccountController, UsuariosController, CitasController,
-                 ExpedientesController,
-                 AudienciasController, DashboardController, NotificacionesController,
-                 SedesController, TrabajadoresController, MateriasController,
-                 PersonasController, CatalogosController (landing)
-Data/            FÃ¡brica de conexiones (IDbConnectionFactory / SqlConnectionFactory)
-Hubs/            NotificacionesHub (SignalR)
-Models/          Entidades + ViewModels
-Repositories/    Repositorios por mÃ³dulo; funciones PostgreSQL y SQL parametrizado
-Services/        GeneraciÃ³n de .docx / Excel / PDF + job de alertas de vencimiento
-Views/           Razor views, con _Layout.cshtml de marca
-wwwroot/         css/site.css, js/site.js, images/ (logos y fotos de marca)
-```
-
-### CatÃ¡logos (Sedes, Trabajadores, Materias, Personas)
-
-CRUD completo para los datos maestros que usa el resto del sistema:
-- **Sedes**: alta, ediciÃ³n, activar/desactivar.
-- **Trabajadores**: alta, ediciÃ³n, activar/desactivar, y "Crear acceso"
-  (da de alta el `Usuario` de un trabajador ya registrado, con su
-  contraseÃ±a hasheada en BCrypt desde el propio controlador).
-- **Materias**: se organizan en dos niveles â€” primero un `TipoMateria`
-  ("Civil y Comercial", "Familia"...) y luego las `Materia` dentro de
-  cada tipo.
-- **Personas**: naturales y jurÃ­dicas, con bÃºsqueda por nombre/razÃ³n
-  social/documento, y sirven para vincularse a un expediente.
-
-Los combos de `Expedientes/Create` y `Audiencias/Programar` (sede,
-trabajador, conciliador, tipo de documento) ahora salen de estos
-catÃ¡logos reales en vez de pedir un ID a mano. En `Expedientes/Details`
-tambiÃ©n se puede vincular una persona o materia ya existente al
-expediente (antes no existÃ­a forma de completar esas relaciones).
-
-### Archivos y videos por expediente
-
-`Expedientes/Details` tiene un panel para subir y descargar archivos:
-
-- **Tipos aceptados**: DOCUMENTO (.pdf/.doc/.docx, 15 MB), IMAGEN
-  (.jpg/.png/.webp, 15 MB), VIDEO (.mp4/.mov/.avi/.webm, 200 MB) y AUDIO
-  (.mp3/.wav/.m4a, 50 MB) â€” lÃ­mites en `TiposArchivoAdjunto` (Models/Documento.cs).
-- **DÃ³nde se guardan**: en Supabase Storage cuando estÃ¡n configurados
-  `Supabase:Url`, `Supabase:ServiceKey` y `Supabase:Bucket`; el respaldo local
-  queda bajo `App_Data/uploads/{idExpediente}/` fuera de `wwwroot`.
-- **Seguridad**: `ArchivoAlmacenamientoService` nunca usa el nombre
-  original del archivo para la ruta fÃ­sica (genera un GUID), valida
-  extensiÃ³n y tamaÃ±o segÃºn el tipo declarado, y la descarga
-  (`Expedientes/DescargarArchivo/{id}`) resuelve el archivo por su
-  `idArchivo` en la base de datos, no por una ruta que venga del cliente.
-- Si se hospeda detrÃ¡s de IIS, ademÃ¡s del lÃ­mite de Kestrel configurado
-  en `Program.cs` (200 MB) hay que subir `maxAllowedContentLength` en
-  `web.config`, porque IIS tiene su propio lÃ­mite (~30 MB) independiente.
-
-### Roles y citas
-
-- **ADMINISTRADOR**: acceso completo, administraciÃ³n de usuarios y cambio de roles.
-- **MESA_PARTES**: registra, consulta, reprograma y cancela citas.
-- **CONCILIADOR**: consulta sus expedientes, citas y audiencias; registra asistencia
-  y convierte una cita atendida en expediente.
-- La conversiÃ³n reutiliza las funciones PostgreSQL existentes para crear la persona
-  y el expediente, y enlaza ambos dentro de una transacciÃ³n.
-- La migraciÃ³n aditiva `Database/06_roles_citas_supabase.sql` crea la tabla de citas.
-  Revisa `Database/07_asegurar_administrador_supabase.sql` para comprobar que exista
-  un administrador antes de publicar la nueva versiÃ³n.
-
-### RecuperaciÃ³n de contraseÃ±a
-
-`Account/OlvideContrasenia` â†’ genera un token (`sp_PasswordResetToken_Generar`)
-y `Account/RestablecerContrasenia` lo valida y actualiza el hash
-(`sp_Usuario_ActualizarContrasenia` + `sp_PasswordResetToken_MarcarUsado`).
-
-El usuario puede solicitar un restablecimiento con una respuesta genÃ©rica.
-Como el sistema no tiene correo configurado, el administrador genera y comparte
-un enlace temporal de un solo uso desde la administraciÃ³n de usuarios. El token
-vence a los 30 minutos.
-
-### Reportes
-
-`/Reportes` dos vistas, cada una exportable a Excel y PDF:
-- **Por rango de fechas**: `sp_Reporte_ExpedientesPorRango`.
-- **Por materia**: `sp_Reporte_ExpedientesPorMateria`, con filtro opcional por tipo de materia.
-
-## Estado de los procedimientos almacenados
-
-Los 58 procedimientos de `BD-SBSS-SP.sql` estÃ¡n conectados a la
-aplicaciÃ³n â€” no queda ninguno "mudo". Cada vez que se tocÃ³ este
-proyecto se volviÃ³ a cruzar programÃ¡ticamente cada llamada en
-`Repositories/*.cs` contra su definiciÃ³n SQL (nombre y parÃ¡metros).
-
-## Carga masiva de datos de prueba
-
-`Database/BD-SBSS-CargaMasiva.sql` agrega volumen realista para poder
-probar filtros, dashboard y reportes con datos variados (el seed
-normal solo trae 1 sede y 2 trabajadores). Ejecutar despuÃ©s de
-`BD-SBSS-Completa.sql` + `BD-SBSS-SP.sql` + `BD-SBSS-Seed.sql`.
-
-Uso mÃ¡s simple â€” genera el catÃ¡logo de materias, 3 sedes adicionales,
-10 trabajadores, 80 personas naturales, 20 jurÃ­dicas, 150 expedientes
-(con sus audiencias y vÃ­nculos a personas/materias) y 25 notificaciones:
-
-```sql
-EXEC sp_CargaMasiva_DatosPrueba;
-```
-
-O con tamaÃ±os propios:
-
-```sql
-EXEC sp_CargaMasiva_DatosPrueba
-    @cantidadTrabajadores = 5,
-    @cantidadPersonasNaturales = 40,
-    @cantidadPersonasJuridicas = 10,
-    @cantidadExpedientes = 300,
-    @cantidadNotificaciones = 50;
-```
-
-TambiÃ©n se pueden ejecutar por separado (`sp_CargaMasiva_Materias`,
-`sp_CargaMasiva_Sedes`, `sp_CargaMasiva_Trabajadores`,
-`sp_CargaMasiva_Personas`, `sp_CargaMasiva_Expedientes`,
-`sp_CargaMasiva_Notificaciones`) si solo quieres agregar volumen a una
-parte puntual.
-
-Es seguro volver a ejecutarlo: cada corrida continÃºa desde el mÃ¡ximo
-DNI/RUC/nÃºmero de expediente numÃ©rico ya existente, asÃ­ que suma mÃ¡s
-datos en vez de chocar con los anteriores.
-
-Los expedientes generados reparten estados de forma realista (~15%
-REGISTRADO, 15% ASIGNADO, 25% EN_PROCESO, 35% CONCLUIDO, 10%
-ARCHIVADO), y la `fechaCierre` nunca es una fecha futura aunque el
-expediente sea reciente y su plazo todavÃ­a no se haya cumplido â€” este
-es un bug real que encontrÃ© simulando la lÃ³gica en Python antes de
-entregar el script, no algo que el chequeo de sintaxis pudiera detectar.
-
-## Punto de entrada
-
-El sistema es de uso interno exclusivo del personal del centro â€” no
-existe un sitio pÃºblico de cara al cliente. La ruta raÃ­z ("/") abre
-directamente `Account/Login`. `HomeController` ya solo maneja la
-pÃ¡gina de error (`/Home/Error`); no tiene una acciÃ³n `Index`. El
-`_Layout.cshtml` no muestra menÃº alguno hasta que hay sesiÃ³n iniciada.
-
-## CatÃ¡logo de ubigeo (Departamento / Provincia / Distrito)
-
-`Database/BD-SBSS-Ubigeo.sql` llena las tablas `Departamento`,
-`Provincia` y `Distrito` (existÃ­an en el esquema desde el inicio pero
-estaban vacÃ­as). Datos: 25 departamentos, 195 provincias, 1839
-distritos, fuente RENIEC (paquete de datos abierto `ubigeo-peru`).
-Ejecutar despuÃ©s de `BD-SBSS-Completa.sql`; es independiente de
-`BD-SBSS-SP.sql` y `BD-SBSS-Seed.sql`.
-
-El script resuelve cada padre (provincia â†’ departamento, distrito â†’
-provincia) por JOIN contra los IDs reales que genera SQL Server, nunca
-asumiendo valores de IDENTITY a mano. Se validÃ³ que las 1839 filas de
-distrito resuelven su provincia y las 195 de provincia resuelven su
-departamento sin ninguna huÃ©rfana.
-
-Esto **no** incluye todavÃ­a el uso de estas tablas en los formularios
-(combos en cascada Departamento â†’ Provincia â†’ Distrito, ni guardar la
-direcciÃ³n de una persona) â€” es el paso previo necesario para poder
-hacerlo mÃ¡s adelante. **ActualizaciÃ³n:** ya se conectÃ³ â€” ver la
-siguiente secciÃ³n.
-
-## Ubigeo conectado a Personas (Departamento â†’ Provincia â†’ Distrito)
-
-`Personas/CreateNatural` y `Personas/CreateJuridica` ahora tienen un
-bloque de direcciÃ³n opcional con 3 combos en cascada
-(`UbigeoController` â†’ `/api/ubigeo/departamentos|provincias/{id}|distritos/{id}`,
-poblados por `wwwroot/js/ubigeo.js`).
-
-- Al guardar, si se seleccionÃ³ un distrito, se crea una fila en
-  `Direccion` y se vincula a la persona en `DetalleDireccion`
-  (`sp_Direccion_Insertar` + `sp_DetalleDireccion_Insertar`). Es un paso
-  separado del alta de la persona, a propÃ³sito: si falla, la persona
-  ya quedÃ³ creada igual (la direcciÃ³n es metadata adicional, no un
-  dato indispensable del registro).
-- Al buscar un RUC en SUNAT, el sistema intenta emparejar el
-  distrito/provincia/departamento de texto que devuelve la API contra
-  el catÃ¡logo ya sembrado (`sp_Distrito_BuscarPorNombres`, comparaciÃ³n
-  `UPPER()`) y, si encuentra coincidencia, autoselecciona la cascada
-  completa. Si no encuentra coincidencia exacta (acentos, nombre
-  distinto, etc.), no rompe nada: simplemente queda para seleccionar a
-  mano, y el mensaje en pantalla lo indica.
-- `Personas/Details` ahora muestra la direcciÃ³n principal si existe
-  (`sp_Persona_ObtenerDireccionPrincipal`).
-
-## IntegraciÃ³n con Decolecta (DNI / RUC)
-
-`Personas/CreateNatural`, `Personas/CreateJuridica` y
-`Trabajadores/Create` tienen un botÃ³n "Buscar en RENIEC / SUNAT" junto
-al campo de documento, que llama a `/api/consultas/dni/{numero}` o
-`/api/consultas/ruc/{numero}` (`ConsultasController`) y autocompleta el
-resto del formulario.
-
-- **Configurar la API key** (no incluida): `dotnet user-secrets set "Decolecta:ApiKey" "tu_api_key"`
-  en desarrollo, o una variable de entorno `Decolecta__ApiKey` en producciÃ³n.
-  Nunca en `appsettings.json` dentro del repositorio.
-- **Arquitectura**: `DecolectaService` (HttpClient tipado) â†’
-  `ConsultasController` (valida el formato del documento antes de
-  llamar a la API externa, para no gastar cuota con valores invÃ¡lidos) â†’
-  `wwwroot/js/consultas.js` (fetch + autocompletado del formulario).
-- Sin la key, o si el servicio no responde, el formulario no se bloquea:
-  se muestra un mensaje y los campos se llenan a mano, igual que antes.
-- La direcciÃ³n que devuelve SUNAT para el RUC se muestra solo como
-  referencia en pantalla â€” no se guarda en la base de datos porque el
-  catÃ¡logo de ubigeo, aunque ya estÃ¡ poblado (ver secciÃ³n anterior),
-  todavÃ­a no estÃ¡ conectado a los formularios de Personas.
-- `DecolectaService` se probÃ³ (de verdad, no solo compilado) contra un
-  servidor HTTP simulado con las respuestas exactas de la documentaciÃ³n
-  de Decolecta (incluidos los cÃ³digos 400/422), porque este entorno de
-  construcciÃ³n no tiene salida a `api.decolecta.com`. Antes de
-  producciÃ³n conviene una prueba manual contra la API real con una key
-  vÃ¡lida.
-
-## Notas para producciÃ³n
-
-- `AlertaVencimientoBackgroundService` corre dentro de la propia app.
-  Si se prefiere desacoplar la revisiÃ³n de vencimientos del ciclo de
-  vida del proceso web, se puede reemplazar por un job de SQL Server
-  Agent que llame a `sp_Notificacion_GenerarAlertasVencimiento`.
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãßxN‹Z–‹­¦ëeŠw¬ÔŒ•ÍÑ§Í¸‘”½¹¥±¥…§Í¸M	ML()Á±¥…§Í¸İ•ˆM@¹9P½É”€ÄÀ¸À5YÁ…É„±„•ÍÑ§Í¸‘”•áÁ•‘¥•¹Ñ•Ì‘”)½¹¥±¥…§Í¸•áÑÉ…©Õ‘¥¥…°‘•°•¹ÑÉ¼‘”½¹¥±¥…§Í¸áÑÉ…©Õ‘¥¥…°M	ML(¡1•ä8»
+À€ÈØàÜÈä¹L¸8»
+À€ÀÀĞ´ÈÀÀÔµ)UL¤¸((ŒŒÉÅÕ¥Ñ•ÑÕÉ„((´€¨©•Í¼„‘…Ñ½Ì•¸I•¹‘•È¨¨è…ÁÁ•ÈÍ½‰É”A½ÍÑÉ•ME0‘”MÕÁ…‰…Í”µ•‘¥…¹Ñ”(€9ÁÍÅ±€¸…Ñ„½AAÉ½Œ¹Í€…‘…ÁÑ„±½Ì¹½µ‰É•Ì‘”IAÍÁ|©€ÅÕ”ÕÍ„±„…ÁÀ„(€™Õ¹¥½¹•ÌA½ÍÑÉ•ME0¸¥Ñ…Ìä…‘µ¥¹¥ÍÑÉ…§Í¸‘”É½±•ÌÕÍ…¸ME0Á…É…µ•ÑÉ¥é…‘¼(€½¹ÑÉ„Ñ…‰±…ÌA½ÍÑÉ•ME0¸(´€¨©MÉ¥ÁÑÌME0¡•É•‘…‘½Ì¨¨è	µM	MLµ½µÁ±•Ñ„¹ÍÅ±€°	µM	MLµM@¹ÍÅ±€°Í••°(€…É„µ…Í¥Ù„äÕ‰¥•¼½¹Ñ¥•¹•¸Í¥¹Ñ…á¥ÌPµME0‘”ME0M•ÉÙ•È¸M¥ÉÙ•¸Á…É„±„(€¥¹ÍÑ…±…§Í¸ME0M•ÉÙ•È‘”‘•Í…ÉÉ½±±¼ì€¨©¹¼Í”•©•ÕÑ…¸•¸MÕÁ…‰…Í”¨¨¸9¼Í½¸(€Õ¹„•áÁ½ÉÑ…§Í¸‘•°•ÍÅÕ•µ„MÕÁ…‰…Í”ÅÕ”å„ÕÑ¥±¥é„I•¹‘•È¸(´€¨©ÕÑ•¹Ñ¥…§Í¸¨¨è½½­¥”‘”M@¹9P½É”€¡‘‘½½­¥•€¤°Ù…±¥‘…¹‘¼½¹ÑÉ„(€ÍÁ}UÍÕ…É¥½}=‰Ñ•¹•ÉA…É…1½¥¹€€¬	ÉåÁĞ¹9•Ñ€Á…É„•°¡…Í ‘”½¹ÑÉ…Í—Å„¸(´€¨©Q¥•µÁ¼É•…°¨¨è!Õ‰Ì½9½Ñ¥™¥…¥½¹•Í!Õˆ¹Í€€¡M¥¹…±H¤€¬Õ¸(€	…­É½Õ¹‘M•ÉÙ¥•€€¡±•ÉÑ…Y•¹¥µ¥•¹Ñ½	…­É½Õ¹‘M•ÉÙ¥•€¤ÅÕ”É•Ù¥Í„(€Ù•¹¥µ¥•¹Ñ½ÌÁ•É§Í‘¥…µ•¹Ñ”ä±±…µ„„ÍÁ}9½Ñ¥™¥…¥½¹}•¹•É…É±•ÉÑ…ÍY•¹¥µ¥•¹Ñ½€¸(´€¨©½Õµ•¹Ñ½Ì¨¨è€¹‘½á€½¸=Á•¸a50M,€¡½Õµ•¹Ñ½]½É‘M•ÉÙ¥•€¤°á•°½¸(€±½Í•‘a50äA½¸EÕ•ÍÑAƒŠPÑ½‘¼Í¥¸‘•Á•¹‘•È‘”]½É½=™™¥”¥¹ÍÑ…±…‘¼(€•¸•°Í•ÉÙ¥‘½È¸(´€¨©É½¹Ñ•¹¨¨è}1…å½ÕĞ¹Í¡Ñµ±€€¬Í¥Ñ”¹ÍÍ€É•ÕÑ¥±¥é…¸±„Á…±•Ñ„ä(€Ñ¥Á½É…›µ„‘•°µ…¹Õ…°‘”µ…É„‘•°•¹ÑÉ¼€¡€ŒÁŒÌàÔÕ€°€”É”Õ”Ñ€°€ŒÅÅÅ‰€°(€A½ÁÁ¥¹Ì½1½É„¤ä•°±½¼É•…°•áÑÉ‡µ‘¼‘”±½ÌA‘”µ…É„°•¸(€İİİÉ½½Ğ½¥µ…•Í€¸((ŒŒ	…Í”‘”‘…Ñ½Ìä‘•ÍÁ±¥•Õ”()°‰…­•¹…ÑÕ…°É•ÅÕ¥•É”A½ÍÑÉ•ME0äÍ”½¹•Ñ„„±„‰…Í”MÕÁ…‰…Í”å„)½¹™¥ÕÉ…‘„¸A…É„•©•ÕÑ…È±½…±µ•¹Ñ”°½¹™¥ÕÉ„½¹¹•Ñ¥½¹MÑÉ¥¹Ìé•™…Õ±Ñ½¹¹•Ñ¥½¹€)½µ¼Í•É•Ñ¼‘”ÕÍÕ…É¥¼¼Ù…É¥…‰±”‘”•¹Ñ½É¹¼¸1„…‘•¹„¹Õ¹„Í”Õ…É‘„•¸¥Ğ¸()1½ÌÍÉ¥ÁÑÌ	µM	MLµ½µÁ±•Ñ„¹ÍÅ±€°	µM	MLµM@¹ÍÅ±€°	µM	MLµM••¹ÍÅ±€°)	µM	MLµ…É…5…Í¥Ù„¹ÍÅ±€ä	µM	MLµU‰¥•¼¹ÍÅ±€Í½¸…ÉÑ•™…Ñ½ÌPµME0‘•°‘¥Í—Å¼)ME0M•ÉÙ•È½É¥¥¹…°¸M”½¹Í•ÉÙ…¸½µ¼É•™•É•¹¥„°Á•É¼¹¼É•…¸¹¤…ÑÕ…±¥é…¸)•°•ÍÅÕ•µ„ÅÕ”½¹ÍÕµ”±„…Á±¥…§Í¸…ÑÕ…°•¸MÕÁ…‰…Í”¸((ŒŒŒAÉ½‘Õ§Í¸•á¥ÍÑ•¹Ñ”•¸I•¹‘•È€¬MÕÁ…‰…Í”((´°‰…­•¹Í¥Õ”½¹•Ó…¹‘½Í”½¸9ÁÍÅ±€¸½¹Í•ÉÙ„•¸I•¹‘•È±½ÌÙ…±½É•Ì(€…ÑÕ…±•Ì‘”½¹¹•Ñ¥½¹MÑÉ¥¹Í}}•™…Õ±Ñ½¹¹•Ñ¥½¹€°MÕÁ…‰…Í•}}UÉ±€°(€MÕÁ…‰…Í•}}M•ÉÙ¥•-•å€äMÕÁ…‰…Í•}}	Õ­•Ñ€ì•ÍÑ”…µ‰¥¼¹¼±½ÌÉ••µÁ±…é„¸(´1„±…Ù”‘”MÕÁ…‰…Í”MÑ½É…”Í”ÅÕ•‘„•¸Ù…É¥…‰±•ÌÍ•É•Ñ…Ì‘”I•¹‘•È°¹Õ¹„(€•¸…ÁÁÍ•ÑÑ¥¹Ì¹©Í½¹€¹¤•¸¥Ñ!Õˆ¸°Í•ÉÙ¥¥¼•á¥ÍÑ•¹Ñ”‘”MÑ½É…”¹¼Í”(€µ½‘¥™¥„¸(´9¼•©•ÕÑ•Ì±½ÌÍÉ¥ÁÑÌPµME0¡•É•‘…‘½Ì•¸•°ME0‘¥Ñ½È‘”MÕÁ…‰…Í”¸A…É„(€•ÍÑ„™Õ¹¥½¹…±¥‘…°•©•ÕÑ„Õ¹„Í½±„Ù•è…Ñ…‰…Í”¼ÀÙ}É½±•Í}¥Ñ…Í}ÍÕÁ…‰…Í”¹ÍÅ±€(€•¸MÕÁ…‰…Í”¸¹Ñ•Ì‘”…Í¥¹…ÈÉ½±•Ì°Í¥Õ”½¸Õ¥‘…‘¼±…Ì¥¹ÍÑÉÕ¥½¹•Ì‘”(€…Ñ…‰…Í”¼Àİ}…Í•ÕÉ…É}…‘µ¥¹¥ÍÑÉ…‘½É}ÍÕÁ…‰…Í”¹ÍÅ±€ä½¹™¥Éµ„ÅÕ”ÑÔÕ•¹Ñ„(€½¹Í•ÉÙ”5%9%MQI=I€¸(´1„É…µ„™•…ÑÕÉ”½É½±•Ìµ¥Ñ…Í€•ÌÁ…É„É•Ù¥Í§Í¸¸I•¹‘•ÈÍ¥Õ”‘•ÍÁ±•…¹‘¼ÍÔ(€É…µ„½¹™¥ÕÉ…‘„ì•ÍÑ½Ì…µ‰¥½Ì¹¼±±•…¸„ÁÉ½‘Õ§Í¸¡…ÍÑ„ÅÕ”Óè±½Ì(€¥¹Ñ•É•ÌÍ•Ÿé¸ÑÔ™±Õ©¼¡…‰¥ÑÕ…°¸()A…É„‘•Í…ÉÉ½±±¼½¸•°‰…­•¹MÕÁ…‰…Í”°±„…‘•¹„‘”½¹•á§Í¸±½…°Í”)½¹™¥ÕÉ„½µ¼Í•É•Ñ¼‘”ÕÍÕ…É¥¼¼Ù…É¥…‰±”‘”•¹Ñ½É¹¼°¹¼Í”Õ…É‘„•¸¥Ğ¸((ŒŒŒÉ•‘•¹¥…±•Ì‘”•©•µÁ±¼ME0M•ÉÙ•È()1…ÌÍ¥Õ¥•¹Ñ•ÌÉ•‘•¹¥…±•Ì±…ÌÉ•„•°Í••ME0M•ÉÙ•È±½…°ì¹¼Í”…ÍÕµ”ÅÕ”)•á¥ÍÑ…¸•¸ÑÔÁÉ½å•Ñ¼MÕÁ…‰…Í”è()ğUÍÕ…É¥¼€€€€€€€ğ½¹ÑÉ…Í—Å„€€€€€€€€€€ğI½°€€€€€€€€€€€ğ)ğ´´´´´´´´´´´´´´´µğ´´´´´´´´´´´´´´´´´´´´´´µğ´´´´´´´´´´´´´´´µğ)ğ…‘µ¥¹€€€€€€€€ğ½¹¥±¥…¥½¸ÈÀÈØ…€€€ğ5%9%MQI=H€ğ)ğ½¹¥±¥…‘½ÈÅ€ğ½¹¥±¥…¥½¸ÈÀÈØ…€€€ğ=9%1%=H€€€ğ()1…Ì½¹ÑÉ…Í—Å…Ì‘•°Í•••ÍÓ…¸Õ…É‘…‘…Ì½µ¼¡…Í 	ÉåÁĞ€¡™…Ñ½È‘”½ÍÑ¼€ÄÄ¤°)¹¼•¸Ñ•áÑ¼Á±…¹¼¸((ğ„´´1•…äÍ•ÑÕÀÑ•áĞÉ•Ñ…¥¹•‰•±½Ü½¹±ä…Ì¡¥ÍÑ½É¥…°É•™•É•¹”¸€´´ø(ğ„´´€È¸©ÕÍÑ…È±„…‘•¹„‘”½¹•á§Í¸•¸…ÁÁÍ•ÑÑ¥¹Ì¹•Ù•±½Áµ•¹Ğ¹©Í½¹€(€€€¡½¹¹•Ñ¥½¹MÑÉ¥¹Ìé•™…Õ±Ñ½¹¹•Ñ¥½¹€¤¸(´´ø((ŒŒÍÑÉÕÑÕÉ„()€)½¹ÑÉ½±±•ÉÌ¼€€€€!½µ•½¹ÑÉ½±±•È°½Õ¹Ñ½¹ÑÉ½±±•È°UÍÕ…É¥½Í½¹ÑÉ½±±•È°¥Ñ…Í½¹ÑÉ½±±•È°(€€€€€€€€€€€€€€€€áÁ•‘¥•¹Ñ•Í½¹ÑÉ½±±•È°(€€€€€€€€€€€€€€€€Õ‘¥•¹¥…Í½¹ÑÉ½±±•È°…Í¡‰½…É‘½¹ÑÉ½±±•È°9½Ñ¥™¥…¥½¹•Í½¹ÑÉ½±±•È°(€€€€€€€€€€€€€€€€M•‘•Í½¹ÑÉ½±±•È°QÉ…‰…©…‘½É•Í½¹ÑÉ½±±•È°5…Ñ•É¥…Í½¹ÑÉ½±±•È°(€€€€€€€€€€€€€€€€A•ÉÍ½¹…Í½¹ÑÉ½±±•È°…Ñ…±½½Í½¹ÑÉ½±±•È€¡±…¹‘¥¹œ¤)…Ñ„¼€€€€€€€€€€€…‰É¥„‘”½¹•á¥½¹•Ì€¡%‰½¹¹•Ñ¥½¹…Ñ½Éä€¼MÅ±½¹¹•Ñ¥½¹…Ñ½Éä¤)!Õ‰Ì¼€€€€€€€€€€€9½Ñ¥™¥…¥½¹•Í!Õˆ€¡M¥¹…±H¤)5½‘•±Ì¼€€€€€€€€€¹Ñ¥‘…‘•Ì€¬Y¥•İ5½‘•±Ì)I•Á½Í¥Ñ½É¥•Ì¼€€€I•Á½Í¥Ñ½É¥½ÌÁ½È·Í‘Õ±¼ì™Õ¹¥½¹•ÌA½ÍÑÉ•ME0äME0Á…É…µ•ÑÉ¥é…‘¼)M•ÉÙ¥•Ì¼€€€€€€€•¹•É…§Í¸‘”€¹‘½à€¼á•°€¼A€¬©½ˆ‘”…±•ÉÑ…Ì‘”Ù•¹¥µ¥•¹Ñ¼)Y¥•İÌ¼€€€€€€€€€€I…é½ÈÙ¥•İÌ°½¸}1…å½ÕĞ¹Í¡Ñµ°‘”µ…É„)İİİÉ½½Ğ¼€€€€€€€€ÍÌ½Í¥Ñ”¹ÍÌ°©Ì½Í¥Ñ”¹©Ì°¥µ…•Ì¼€¡±½½Ìä™½Ñ½Ì‘”µ…É„¤)€((ŒŒŒ…Ó…±½½Ì€¡M•‘•Ì°QÉ…‰…©…‘½É•Ì°5…Ñ•É¥…Ì°A•ÉÍ½¹…Ì¤()IU½µÁ±•Ñ¼Á…É„±½Ì‘…Ñ½Ìµ…•ÍÑÉ½ÌÅÕ”ÕÍ„•°É•ÍÑ¼‘•°Í¥ÍÑ•µ„è(´€¨©M•‘•Ì¨¨è…±Ñ„°•‘¥§Í¸°…Ñ¥Ù…È½‘•Í…Ñ¥Ù…È¸(´€¨©QÉ…‰…©…‘½É•Ì¨¨è…±Ñ„°•‘¥§Í¸°…Ñ¥Ù…È½‘•Í…Ñ¥Ù…È°ä€‰É•…È…•Í¼ˆ(€€¡‘„‘”…±Ñ„•°UÍÕ…É¥½€‘”Õ¸ÑÉ…‰…©…‘½Èå„É•¥ÍÑÉ…‘¼°½¸ÍÔ(€½¹ÑÉ…Í—Å„¡…Í¡•…‘„•¸	ÉåÁĞ‘•Í‘”•°ÁÉ½Á¥¼½¹ÑÉ½±…‘½È¤¸(´€¨©5…Ñ•É¥…Ì¨¨èÍ”½É…¹¥é…¸•¸‘½Ì¹¥Ù•±•ÌƒŠPÁÉ¥µ•É¼Õ¸Q¥Á½5…Ñ•É¥…€(€€ ‰¥Ù¥°ä½µ•É¥…°ˆ°€‰…µ¥±¥„ˆ¸¸¸¤ä±Õ•¼±…Ì5…Ñ•É¥…€‘•¹ÑÉ¼‘”(€…‘„Ñ¥Á¼¸(´€¨©A•ÉÍ½¹…Ì¨¨è¹…ÑÕÉ…±•Ìä©ÕËµ‘¥…Ì°½¸‹éÍÅÕ•‘„Á½È¹½µ‰É”½É…ëÍ¸(€Í½¥…°½‘½Õµ•¹Ñ¼°äÍ¥ÉÙ•¸Á…É„Ù¥¹Õ±…ÉÍ”„Õ¸•áÁ•‘¥•¹Ñ”¸()1½Ì½µ‰½Ì‘”áÁ•‘¥•¹Ñ•Ì½É•…Ñ•€äÕ‘¥•¹¥…Ì½AÉ½É…µ…É€€¡Í•‘”°)ÑÉ…‰…©…‘½È°½¹¥±¥…‘½È°Ñ¥Á¼‘”‘½Õµ•¹Ñ¼¤…¡½É„Í…±•¸‘”•ÍÑ½Ì)…Ó…±½½ÌÉ•…±•Ì•¸Ù•è‘”Á•‘¥ÈÕ¸%„µ…¹¼¸¸áÁ•‘¥•¹Ñ•Ì½•Ñ…¥±Í€)Ñ…µ‰§¥¸Í”ÁÕ•‘”Ù¥¹Õ±…ÈÕ¹„Á•ÉÍ½¹„¼µ…Ñ•É¥„å„•á¥ÍÑ•¹Ñ”…°)•áÁ•‘¥•¹Ñ”€¡…¹Ñ•Ì¹¼•á¥ÍÓµ„™½Éµ„‘”½µÁ±•Ñ…È•Í…ÌÉ•±…¥½¹•Ì¤¸((ŒŒŒÉ¡¥Ù½ÌäÙ¥‘•½ÌÁ½È•áÁ•‘¥•¹Ñ”()áÁ•‘¥•¹Ñ•Ì½•Ñ…¥±Í€Ñ¥•¹”Õ¸Á…¹•°Á…É„ÍÕ‰¥Èä‘•Í…É…È…É¡¥Ù½Ìè((´€¨©Q¥Á½Ì…•ÁÑ…‘½Ì¨¨è=U59Q<€ ¹Á‘˜¼¹‘½Œ¼¹‘½à°€ÄÔƒßx¶‰ËkºwµçPµM	MLµM••¹ÍÅ±€¸()UÍ¼·…ÌÍ¥µÁ±”ƒŠP•¹•É„•°…Ó…±½¼‘”µ…Ñ•É¥…Ì°€ÌÍ•‘•Ì…‘¥¥½¹…±•Ì°(ÄÀÑÉ…‰…©…‘½É•Ì°€àÀÁ•ÉÍ½¹…Ì¹…ÑÕÉ…±•Ì°€ÈÀ©ÕËµ‘¥…Ì°€ÄÔÀ•áÁ•‘¥•¹Ñ•Ì(¡½¸ÍÕÌ…Õ‘¥•¹¥…ÌäÛµ¹Õ±½Ì„Á•ÉÍ½¹…Ì½µ…Ñ•É¥…Ì¤ä€ÈÔ¹½Ñ¥™¥…¥½¹•Ìè()ÍÅ°)aÍÁ}…É…5…Í¥Ù…}…Ñ½ÍAÉÕ•‰„ì)€()<½¸Ñ…µ‡Å½ÌÁÉ½Á¥½Ìè()ÍÅ°)aÍÁ}…É…5…Í¥Ù…}…Ñ½ÍAÉÕ•‰„(€€€…¹Ñ¥‘…‘QÉ…‰…©…‘½É•Ì€ô€Ô°(€€€…¹Ñ¥‘…‘A•ÉÍ½¹…Í9…ÑÕÉ…±•Ì€ô€ĞÀ°(€€€…¹Ñ¥‘…‘A•ÉÍ½¹…Í)ÕÉ¥‘¥…Ì€ô€ÄÀ°(€€€…¹Ñ¥‘…‘áÁ•‘¥•¹Ñ•Ì€ô€ÌÀÀ°(€€€…¹Ñ¥‘…‘9½Ñ¥™¥…¥½¹•Ì€ô€ÔÀì)€()Q…µ‰§¥¸Í”ÁÕ•‘•¸•©•ÕÑ…ÈÁ½ÈÍ•Á…É…‘¼€¡ÍÁ}…É…5…Í¥Ù…}5…Ñ•É¥…Í€°)ÍÁ}…É…5…Í¥Ù…}M•‘•Í€°ÍÁ}…É…5…Í¥Ù…}QÉ…‰…©…‘½É•Í€°)ÍÁ}…É…5…Í¥Ù…}A•ÉÍ½¹…Í€°ÍÁ}…É…5…Í¥Ù…}áÁ•‘¥•¹Ñ•Í€°)ÍÁ}…É…5…Í¥Ù…}9½Ñ¥™¥…¥½¹•Í€¤Í¤Í½±¼ÅÕ¥•É•Ì…É•…ÈÙ½±Õµ•¸„Õ¹„)Á…ÉÑ”ÁÕ¹ÑÕ…°¸()ÌÍ•ÕÉ¼Ù½±Ù•È„•©•ÕÑ…É±¼è…‘„½ÉÉ¥‘„½¹Ñ¥»é„‘•Í‘”•°·…á¥µ¼)9$½IU½»éµ•É¼‘”•áÁ•‘¥•¹Ñ”¹Õ·¥É¥¼å„•á¥ÍÑ•¹Ñ”°…Ï´ÅÕ”ÍÕµ„·…Ì)‘…Ñ½Ì•¸Ù•è‘”¡½…È½¸±½Ì…¹Ñ•É¥½É•Ì¸()1½Ì•áÁ•‘¥•¹Ñ•Ì•¹•É…‘½ÌÉ•Á…ÉÑ•¸•ÍÑ…‘½Ì‘”™½Éµ„É•…±¥ÍÑ„€¡øÄÔ”)I%MQI<°€ÄÔ”M%9<°€ÈÔ”9}AI=M<°€ÌÔ”=91U%<°€ÄÀ”)I!%Y<¤°ä±„™•¡…¥•ÉÉ•€¹Õ¹„•ÌÕ¹„™•¡„™ÕÑÕÉ„…Õ¹ÅÕ”•°)•áÁ•‘¥•¹Ñ”Í•„É•¥•¹Ñ”äÍÔÁ±…é¼Ñ½‘…Ûµ„¹¼Í”¡…å„ÕµÁ±¥‘¼ƒŠP•ÍÑ”)•ÌÕ¸‰ÕœÉ•…°ÅÕ”•¹½¹ÑË¤Í¥µÕ±…¹‘¼±„³Í¥„•¸AåÑ¡½¸…¹Ñ•Ì‘”)•¹ÑÉ•…È•°ÍÉ¥ÁĞ°¹¼…±¼ÅÕ”•°¡•ÅÕ•¼‘”Í¥¹Ñ…á¥ÌÁÕ‘¥•É„‘•Ñ•Ñ…È¸((ŒŒAÕ¹Ñ¼‘”•¹ÑÉ…‘„()°Í¥ÍÑ•µ„•Ì‘”ÕÍ¼¥¹Ñ•É¹¼•á±ÕÍ¥Ù¼‘•°Á•ÉÍ½¹…°‘•°•¹ÑÉ¼ƒŠP¹¼)•á¥ÍÑ”Õ¸Í¥Ñ¥¼Ãé‰±¥¼‘”…É„…°±¥•¹Ñ”¸1„ÉÕÑ„É‡µè€ ˆ¼ˆ¤…‰É”)‘¥É•Ñ…µ•¹Ñ”½Õ¹Ğ½1½¥¹€¸!½µ•½¹ÑÉ½±±•É€å„Í½±¼µ…¹•©„±„)Ã…¥¹„‘”•ÉÉ½È€¡€½!½µ”½ÉÉ½É€¤ì¹¼Ñ¥•¹”Õ¹„…§Í¸%¹‘•á€¸°)}1…å½ÕĞ¹Í¡Ñµ±€¹¼µÕ•ÍÑÉ„µ•»è…±Õ¹¼¡…ÍÑ„ÅÕ”¡…äÍ•Í§Í¸¥¹¥¥…‘„¸((ŒŒ…Ó…±½¼‘”Õ‰¥•¼€¡•Á…ÉÑ…µ•¹Ñ¼€¼AÉ½Ù¥¹¥„€¼¥ÍÑÉ¥Ñ¼¤()…Ñ…‰…Í”½	µM	MLµU‰¥•¼¹ÍÅ±€±±•¹„±…ÌÑ…‰±…Ì•Á…ÉÑ…µ•¹Ñ½€°)AÉ½Ù¥¹¥…€ä¥ÍÑÉ¥Ñ½€€¡•á¥ÍÓµ…¸•¸•°•ÍÅÕ•µ„‘•Í‘”•°¥¹¥¥¼Á•É¼)•ÍÑ…‰…¸Ù…µ…Ì¤¸…Ñ½Ìè€ÈÔ‘•Á…ÉÑ…µ•¹Ñ½Ì°€ÄäÔÁÉ½Ù¥¹¥…Ì°€ÄàÌä)‘¥ÍÑÉ¥Ñ½Ì°™Õ•¹Ñ”I9%€¡Á…ÅÕ•Ñ”‘”‘…Ñ½Ì…‰¥•ÉÑ¼Õ‰¥•¼µÁ•ÉÕ€¤¸)©•ÕÑ…È‘•ÍÁ×¥Ì‘”	µM	MLµ½µÁ±•Ñ„¹ÍÅ±€ì•Ì¥¹‘•Á•¹‘¥•¹Ñ”‘”)	µM	MLµM@¹ÍÅ±€ä	µM	MLµM••¹ÍÅ±€¸()°ÍÉ¥ÁĞÉ•ÍÕ•±Ù”…‘„Á…‘É”€¡ÁÉ½Ù¥¹¥„ƒŠH‘•Á…ÉÑ…µ•¹Ñ¼°‘¥ÍÑÉ¥Ñ¼ƒŠH)ÁÉ½Ù¥¹¥„¤Á½È)=%8½¹ÑÉ„±½Ì%ÌÉ•…±•ÌÅÕ”•¹•É„ME0M•ÉÙ•È°¹Õ¹„)…ÍÕµ¥•¹‘¼Ù…±½É•Ì‘”%9Q%Qd„µ…¹¼¸M”Ù…±¥“ÌÅÕ”±…Ì€ÄàÌä™¥±…Ì‘”)‘¥ÍÑÉ¥Ñ¼É•ÍÕ•±Ù•¸ÍÔÁÉ½Ù¥¹¥„ä±…Ì€ÄäÔ‘”ÁÉ½Ù¥¹¥„É•ÍÕ•±Ù•¸ÍÔ)‘•Á…ÉÑ…µ•¹Ñ¼Í¥¸¹¥¹Õ¹„¡×¥É™…¹„¸()ÍÑ¼€¨©¹¼¨¨¥¹±Õå”Ñ½‘…Ûµ„•°ÕÍ¼‘”•ÍÑ…ÌÑ…‰±…Ì•¸±½Ì™½ÉµÕ±…É¥½Ì(¡½µ‰½Ì•¸…Í…‘„•Á…ÉÑ…µ•¹Ñ¼ƒŠHAÉ½Ù¥¹¥„ƒŠH¥ÍÑÉ¥Ñ¼°¹¤Õ…É‘…È±„)‘¥É•§Í¸‘”Õ¹„Á•ÉÍ½¹„¤ƒŠP•Ì•°Á…Í¼ÁÉ•Ù¥¼¹••Í…É¥¼Á…É„Á½‘•È)¡…•É±¼·…Ì…‘•±…¹Ñ”¸€¨©ÑÕ…±¥é…§Í¸è¨¨å„Í”½¹•ÓÌƒŠPÙ•È±„)Í¥Õ¥•¹Ñ”Í•§Í¸¸((ŒŒU‰¥•¼½¹•Ñ…‘¼„A•ÉÍ½¹…Ì€¡•Á…ÉÑ…µ•¹Ñ¼ƒŠHAÉ½Ù¥¹¥„ƒŠH¥ÍÑÉ¥Ñ¼¤()A•ÉÍ½¹…Ì½É•…Ñ•9…ÑÕÉ…±€äA•ÉÍ½¹…Ì½É•…Ñ•)ÕÉ¥‘¥…€…¡½É„Ñ¥•¹•¸Õ¸)‰±½ÅÕ”‘”‘¥É•§Í¸½Á¥½¹…°½¸€Ì½µ‰½Ì•¸…Í…‘„(¡U‰¥•½½¹ÑÉ½±±•É€ƒŠH€½…Á¤½Õ‰¥•¼½‘•Á…ÉÑ…µ•¹Ñ½ÍñÁÉ½Ù¥¹¥…Ì½í¥‘õñ‘¥ÍÑÉ¥Ñ½Ì½í¥‘õ€°)Á½‰±…‘½ÌÁ½ÈİİİÉ½½Ğ½©Ì½Õ‰¥•¼¹©Í€¤¸((´°Õ…É‘…È°Í¤Í”Í•±•¥½»ÌÕ¸‘¥ÍÑÉ¥Ñ¼°Í”É•„Õ¹„™¥±„•¸(€¥É•¥½¹€äÍ”Ù¥¹Õ±„„±„Á•ÉÍ½¹„•¸•Ñ…±±•¥É•¥½¹€(€€¡ÍÁ}¥É•¥½¹}%¹Í•ÉÑ…É€€¬ÍÁ}•Ñ…±±•¥É•¥½¹}%¹Í•ÉÑ…É€¤¸ÌÕ¸Á…Í¼(€Í•Á…É…‘¼‘•°…±Ñ„‘”±„Á•ÉÍ½¹„°„ÁÉ½ÃÍÍ¥Ñ¼èÍ¤™…±±„°±„Á•ÉÍ½¹„(€å„ÅÕ•“ÌÉ•…‘„¥Õ…°€¡±„‘¥É•§Í¸•Ìµ•Ñ…‘…Ñ„…‘¥¥½¹…°°¹¼Õ¸(€‘…Ñ¼¥¹‘¥ÍÁ•¹Í…‰±”‘•°É•¥ÍÑÉ¼¤¸(´°‰ÕÍ…ÈÕ¸IU•¸MU9P°•°Í¥ÍÑ•µ„¥¹Ñ•¹Ñ„•µÁ…É•©…È•°(€‘¥ÍÑÉ¥Ñ¼½ÁÉ½Ù¥¹¥„½‘•Á…ÉÑ…µ•¹Ñ¼‘”Ñ•áÑ¼ÅÕ”‘•ÙÕ•±Ù”±„A$½¹ÑÉ„(€•°…Ó…±½¼å„Í•µ‰É…‘¼€¡ÍÁ}¥ÍÑÉ¥Ñ½}	ÕÍ…ÉA½É9½µ‰É•Í€°½µÁ…É…§Í¸(€UAAH ¥€¤ä°Í¤•¹Õ•¹ÑÉ„½¥¹¥‘•¹¥„°…ÕÑ½Í•±•¥½¹„±„…Í…‘„(€½µÁ±•Ñ„¸M¤¹¼•¹Õ•¹ÑÉ„½¥¹¥‘•¹¥„•á…Ñ„€¡…•¹Ñ½Ì°¹½µ‰É”(€‘¥ÍÑ¥¹Ñ¼°•ÑŒ¸¤°¹¼É½µÁ”¹…‘„èÍ¥µÁ±•µ•¹Ñ”ÅÕ•‘„Á…É„Í•±•¥½¹…È„(€µ…¹¼°ä•°µ•¹Í…©”•¸Á…¹Ñ…±±„±¼¥¹‘¥„¸(´A•ÉÍ½¹…Ì½•Ñ…¥±Í€…¡½É„µÕ•ÍÑÉ„±„‘¥É•§Í¸ÁÉ¥¹¥Á…°Í¤•á¥ÍÑ”(€€¡ÍÁ}A•ÉÍ½¹…}=‰Ñ•¹•É¥É•¥½¹AÉ¥¹¥Á…±€¤¸((ŒŒ%¹Ñ•É…§Í¸½¸•½±•Ñ„€¡9$€¼IU¤()A•ÉÍ½¹…Ì½É•…Ñ•9…ÑÕÉ…±€°A•ÉÍ½¹…Ì½É•…Ñ•)ÕÉ¥‘¥…€ä)QÉ…‰…©…‘½É•Ì½É•…Ñ•€Ñ¥•¹•¸Õ¸‰½ÓÍ¸€‰	ÕÍ…È•¸I9%€¼MU9Pˆ©Õ¹Ñ¼)…°…µÁ¼‘”‘½Õµ•¹Ñ¼°ÅÕ”±±…µ„„€½…Á¤½½¹ÍÕ±Ñ…Ì½‘¹¤½í¹Õµ•É½õ€¼)€½…Á¤½½¹ÍÕ±Ñ…Ì½ÉÕŒ½í¹Õµ•É½õ€€¡½¹ÍÕ±Ñ…Í½¹ÑÉ½±±•É€¤ä…ÕÑ½½µÁ±•Ñ„•°)É•ÍÑ¼‘•°™½ÉµÕ±…É¥¼¸((´€¨©½¹™¥ÕÉ…È±„A$­•ä¨¨€¡¹¼¥¹±Õ¥‘„¤è‘½Ñ¹•ĞÕÍ•ÈµÍ•É•ÑÌÍ•Ğ€‰•½±•Ñ„éÁ¥-•äˆ€‰ÑÕ}…Á¥}­•ä‰€(€•¸‘•Í…ÉÉ½±±¼°¼Õ¹„Ù…É¥…‰±”‘”•¹Ñ½É¹¼•½±•Ñ…}}Á¥-•å€•¸ÁÉ½‘Õ§Í¸¸(€9Õ¹„•¸…ÁÁÍ•ÑÑ¥¹Ì¹©Í½¹€‘•¹ÑÉ¼‘•°É•Á½Í¥Ñ½É¥¼¸(´€¨©ÉÅÕ¥Ñ•ÑÕÉ„¨¨è•½±•Ñ…M•ÉÙ¥•€€¡!ÑÑÁ±¥•¹ĞÑ¥Á…‘¼¤ƒŠH(€½¹ÍÕ±Ñ…Í½¹ÑÉ½±±•É€€¡Ù…±¥‘„•°™½Éµ…Ñ¼‘•°‘½Õµ•¹Ñ¼…¹Ñ•Ì‘”(€±±…µ…È„±„A$•áÑ•É¹„°Á…É„¹¼…ÍÑ…ÈÕ½Ñ„½¸Ù…±½É•Ì¥¹Û…±¥‘½Ì¤ƒŠH(€İİİÉ½½Ğ½©Ì½½¹ÍÕ±Ñ…Ì¹©Í€€¡™•Ñ €¬…ÕÑ½½µÁ±•Ñ…‘¼‘•°™½ÉµÕ±…É¥¼¤¸(´M¥¸±„­•ä°¼Í¤•°Í•ÉÙ¥¥¼¹¼É•ÍÁ½¹‘”°•°™½ÉµÕ±…É¥¼¹¼Í”‰±½ÅÕ•„è(€Í”µÕ•ÍÑÉ„Õ¸µ•¹Í…©”ä±½Ì…µÁ½ÌÍ”±±•¹…¸„µ…¹¼°¥Õ…°ÅÕ”…¹Ñ•Ì¸(´1„‘¥É•§Í¸ÅÕ”‘•ÙÕ•±Ù”MU9PÁ…É„•°IUÍ”µÕ•ÍÑÉ„Í½±¼½µ¼(€É•™•É•¹¥„•¸Á…¹Ñ…±±„ƒŠP¹¼Í”Õ…É‘„•¸±„‰…Í”‘”‘…Ñ½ÌÁ½ÉÅÕ”•°(€…Ó…±½¼‘”Õ‰¥•¼°…Õ¹ÅÕ”å„•ÍÓ„Á½‰±…‘¼€¡Ù•ÈÍ•§Í¸…¹Ñ•É¥½È¤°(€Ñ½‘…Ûµ„¹¼•ÍÓ„½¹•Ñ…‘¼„±½Ì™½ÉµÕ±…É¥½Ì‘”A•ÉÍ½¹…Ì¸(´•½±•Ñ…M•ÉÙ¥•€Í”ÁÉ½‹Ì€¡‘”Ù•É‘…°¹¼Í½±¼½µÁ¥±…‘¼¤½¹ÑÉ„Õ¸(€Í•ÉÙ¥‘½È!QQ@Í¥µÕ±…‘¼½¸±…ÌÉ•ÍÁÕ•ÍÑ…Ì•á…Ñ…Ì‘”±„‘½Õµ•¹Ñ…§Í¸(€‘”•½±•Ñ„€¡¥¹±Õ¥‘½Ì±½ÌÍ‘¥½Ì€ĞÀÀ¼ĞÈÈ¤°Á½ÉÅÕ”•ÍÑ”•¹Ñ½É¹¼‘”(€½¹ÍÑÉÕ§Í¸¹¼Ñ¥•¹”Í…±¥‘„„…Á¤¹‘•½±•Ñ„¹½µ€¸¹Ñ•Ì‘”(€ÁÉ½‘Õ§Í¸½¹Ù¥•¹”Õ¹„ÁÉÕ•‰„µ…¹Õ…°½¹ÑÉ„±„A$É•…°½¸Õ¹„­•ä(€Û…±¥‘„¸((ŒŒ9½Ñ…ÌÁ…É„ÁÉ½‘Õ§Í¸((´±•ÉÑ…Y•¹¥µ¥•¹Ñ½	…­É½Õ¹‘M•ÉÙ¥•€½ÉÉ”‘•¹ÑÉ¼‘”±„ÁÉ½Á¥„…ÁÀ¸(€M¤Í”ÁÉ•™¥•É”‘•Í…½Á±…È±„É•Ù¥Í§Í¸‘”Ù•¹¥µ¥•¹Ñ½Ì‘•°¥±¼‘”(€Ù¥‘„‘•°ÁÉ½•Í¼İ•ˆ°Í”ÁÕ•‘”É••µÁ±…é…ÈÁ½ÈÕ¸©½ˆ‘”ME0M•ÉÙ•È(€•¹ĞÅÕ”±±…µ”„ÍÁ}9½Ñ¥™¥…¥½¹}•¹•É…É±•ÉÑ…ÍY•¹¥µ¥•¹Ñ½€¸
