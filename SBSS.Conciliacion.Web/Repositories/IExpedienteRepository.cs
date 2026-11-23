@@ -10,6 +10,7 @@ public interface IExpedienteRepository
     Task<int> AsignarConciliadorAleatorioAsync(int idExpediente);
     Task<int> InsertarComoConciliadorAsync(CrearExpedienteVm vm, int idConciliador);
     Task CambiarEstadoAsync(int idExpediente, string nuevoEstado);
+    Task TrasladarAsync(TrasladarExpedienteVm vm, int idTrabajadorActor, bool esAdministrador);
     Task<ExpedienteDetalleVm?> ObtenerPorIdAsync(int idExpediente);
     Task<IEnumerable<ExpedienteListItemVm>> ListarAsync(ExpedienteFiltroVm filtro);
     Task AgregarPersonaAsync(AgregarPersonaExpedienteVm vm);
