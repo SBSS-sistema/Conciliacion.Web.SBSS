@@ -6,7 +6,7 @@
 }
 <div class="wrap page-head"><span class="eyebrow">Cita</span><h1>@Model.NombreCliente @Model.ApellidoPaterno @Model.ApellidoMaterno</h1><p><strong>@Model.Estado</strong> · @Model.FechaHora.ToString("dd/MM/yyyy HH:mm")</p></div>
 <div class="wrap" style="display:grid;grid-template-columns:2fr 1fr;gap:22px;">
-<div class="panel"><h3>Datos de la atención</h3><p><strong>DNI:</strong> @Model.DniCliente</p><p><strong>Teléfono:</strong> @(Model.Telefono ?? "—")</p><p><strong>Correo:</strong> @(Model.Correo ?? "—")</p><p><strong>Conciliador:</strong> @Model.Conciliador</p><p><strong>Motivo:</strong><br/>@Model.Motivo</p><p><strong>Observaciones:</strong><br/>@(Model.Observaciones ?? "—")</p>
+<div class="panel"><h3>Datos de la atención</h3><p><strong>Documento:</strong> @Model.DniCliente</p><p><strong>Materia:</strong> @(Model.NombreMateria ?? "—")</p><p><strong>Teléfono:</strong> @(Model.Telefono ?? "—")</p><p><strong>Correo:</strong> @(Model.Correo ?? "—")</p><p><strong>Conciliador:</strong> @Model.Conciliador</p><p><strong>Motivo:</strong><br/>@Model.Motivo</p><p><strong>Observaciones:</strong><br/>@(Model.Observaciones ?? "—")</p>
 @if (Model.IdExpediente.HasValue) { <p><a asp-controller="Expedientes" asp-action="Details" asp-route-id="@Model.IdExpediente" class="btn btn-primary">Abrir expediente @Model.IdExpediente</a></p> }
 </div>
 <div>
