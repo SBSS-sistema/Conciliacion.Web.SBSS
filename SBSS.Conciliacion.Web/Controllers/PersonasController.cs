@@ -5,7 +5,7 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize(Roles = "ADMINISTRADOR")]
+[Authorize(Roles = "ADMINISTRADOR,MESA_DE_PARTES")]
 public class PersonasController : Controller
 {
     private readonly IPersonaRepository _personas;
@@ -28,11 +28,13 @@ public class PersonasController : Controller
         return View(persona);
     }
 
+    [Authorize(Roles = "ADMINISTRADOR")]
     [HttpGet]
     public IActionResult CreateNatural() => View(new CrearPersonaNaturalVm());
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> CreateNatural(CrearPersonaNaturalVm vm)
     {
         if (!ModelState.IsValid) return View(vm);
@@ -44,11 +46,13 @@ public class PersonasController : Controller
         return RedirectToAction(nameof(Details), new { id = idPersona });
     }
 
+    [Authorize(Roles = "ADMINISTRADOR")]
     [HttpGet]
     public IActionResult CreateJuridica() => View(new CrearPersonaJuridicaVm());
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> CreateJuridica(CrearPersonaJuridicaVm vm)
     {
         if (!ModelState.IsValid) return View(vm);
@@ -62,6 +66,7 @@ public class PersonasController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> CambiarEstado(CambiarEstadoPersonaVm vm)
     {
         await _personas.CambiarEstadoAsync(vm.IdPersona, vm.EstadoPersona);
@@ -84,3 +89,4 @@ public class PersonasController : Controller
         await _personas.VincularDireccionAsync(idPersona, idDireccion);
     }
 }
+
