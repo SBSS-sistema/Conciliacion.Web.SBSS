@@ -1,3 +1,4 @@
+using Dapper;
 using SBSS.Conciliacion.Web.Data;
 using SBSS.Conciliacion.Web.Models;
 
