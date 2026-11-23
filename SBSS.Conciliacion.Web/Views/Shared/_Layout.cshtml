@@ -44,11 +44,16 @@
                 @if (User.IsInRole("ADMINISTRADOR") || User.IsInRole("CONCILIADOR"))
                 {
                     <a asp-controller="Expedientes" asp-action="Index" class="@Activo("Expedientes", "Audiencias")">Expedientes</a>
+                }
+                @if (User.IsInRole("ADMINISTRADOR") || User.IsInRole("CONCILIADOR") || User.IsInRole("MESA_DE_PARTES"))
+                {
                     <a asp-controller="Calendario" asp-action="Index" class="@Activo("Calendario")">Calendario</a>
                 }
                 @if (User.IsInRole("MESA_DE_PARTES"))
                 {
-                    <a asp-controller="Expedientes" asp-action="Create" class="@Activo("Expedientes")">Registrar expediente</a>
+                    <a asp-controller="Materias" asp-action="Index" class="@Activo("Materias")">Materias</a>
+                    <a asp-controller="Sedes" asp-action="Index" class="@Activo("Sedes")">Sedes</a>
+                    <a asp-controller="Personas" asp-action="Index" class="@Activo("Personas")">Personas</a>
                 }
                 @if (User.IsInRole("CONCILIADOR"))
                 {
