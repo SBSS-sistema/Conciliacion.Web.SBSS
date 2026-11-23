@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using SBSS.Conciliacion.Web.Data;
 using SBSS.Conciliacion.Web.Hubs;
