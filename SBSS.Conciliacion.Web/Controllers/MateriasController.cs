@@ -5,7 +5,7 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR,MESA_DE_PARTES")]
 public class MateriasController : Controller
 {
     private readonly IMateriaRepository _materias;
