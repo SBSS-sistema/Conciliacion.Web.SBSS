@@ -27,7 +27,20 @@
                 <span asp-validation-for="Usuario" class="text-danger"></span>
 
                 <label asp-for="Contrasenia">Contraseña</label>
-                <input asp-for="Contrasenia" class="form-control" />
+                <div style="position:relative;">
+                    <input asp-for="Contrasenia" type="password" autocomplete="current-password" class="form-control" style="padding-right:3.25rem;" />
+                    <button type="button" id="togglePassword" aria-label="Mostrar contraseña" aria-controls="Contrasenia" aria-pressed="false"
+                            style="position:absolute;inset-block:0;right:0.35rem;width:2.5rem;border:0;background:transparent;color:var(--muted);cursor:pointer;display:grid;place-items:center;">
+                        <svg data-eye-show viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        <svg data-eye-hide viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" hidden>
+                            <path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                            <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a15.8 15.8 0 0 1-3.1 3.9M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7c1.2 0 2.3-.3 3.3-.7" />
+                        </svg>
+                    </button>
+                </div>
                 <span asp-validation-for="Contrasenia" class="text-danger"></span>
 
                 <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;">Ingresar</button>
@@ -42,4 +55,20 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const passwordInput = document.getElementById("Contrasenia");
+            const passwordToggle = document.getElementById("togglePassword");
+
+            passwordToggle?.addEventListener("click", () => {
+                const showPassword = passwordInput.type === "password";
+                passwordInput.type = showPassword ? "text" : "password";
+                passwordToggle.setAttribute("aria-label", showPassword ? "Ocultar contraseña" : "Mostrar contraseña");
+                passwordToggle.setAttribute("aria-pressed", String(showPassword));
+                passwordToggle.querySelector("[data-eye-show]").hidden = showPassword;
+                passwordToggle.querySelector("[data-eye-hide]").hidden = !showPassword;
+            });
+        })();
+    </script>
 }
+
