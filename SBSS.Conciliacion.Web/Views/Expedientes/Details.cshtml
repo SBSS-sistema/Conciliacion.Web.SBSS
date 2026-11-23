@@ -156,6 +156,34 @@
                 <button type="submit" class="btn btn-primary" style="width:100%;">Subir archivo</button>
             </form>
         </div>
+
+        @if (e.EstadoProceso is not ("CONCLUIDO" or "ARCHIVADO"))
+        {
+            <div class="panel">
+                <h3 style="margin-bottom:8px;">Cambiar de sede</h3>
+                <p style="color:#4a5a61;margin-bottom:16px;">El expediente seguirá siendo el mismo. Sus personas, audiencias y archivos permanecerán vinculados; se asignará un conciliador activo de la sede nueva.</p>
+                <form asp-action="TrasladarSede" method="post" class="form-sbss"
+                      onsubmit="return confirm('Se cambiará la sede y el conciliador asignado de este expediente. ¿Deseas continuar?');">
+                    <input type="hidden" name="IdExpediente" value="@e.IdExpediente" />
+                    <label for="IdSedeDestino">Nueva sede</label>
+                    <select id="IdSedeDestino" name="IdSedeDestino" class="form-control" required>
+                        <option value="">-- Selecciona la sede --</option>
+                        @foreach (var sede in (ViewBag.SedesTraslado as List<Sede> ?? new()).Where(s => s.IdSede != e.IdSede))
+                        {
+                            <option value="@sede.IdSede">@sede.Nombre</option>
+                        }
+                    </select>
+                    <label for="IdConciliadorNuevo">Conciliador de la nueva sede</label>
+                    <select id="IdConciliadorNuevo" name="IdConciliadorNuevo" class="form-control" required disabled>
+                        <option value="">-- Primero selecciona una sede --</option>
+                    </select>
+                    <label for="Motivo">Motivo del traslado</label>
+                    <textarea id="Motivo" name="Motivo" class="form-control" rows="3" maxlength="500" required
+                              placeholder="Por ejemplo: cambio de domicilio de la persona solicitante."></textarea>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">Trasladar expediente</button>
+                </form>
+            </div>
+        }
     </div>
 
     <div>
@@ -240,3 +268,41 @@
     </div>
 </div>
 
+
+@section Scripts {
+<script>
+    (function () {
+        var sede = document.getElementById('IdSedeDestino');
+        var conciliador = document.getElementById('IdConciliadorNuevo');
+        if (!sede || !conciliador) return;
+
+        sede.addEventListener('change', async function () {
+            conciliador.disabled = true;
+            conciliador.innerHTML = '<option value="">Cargando conciliadores...</option>';
+            if (!sede.value) {
+                conciliador.innerHTML = '<option value="">-- Primero selecciona una sede --</option>';
+                return;
+            }
+
+            try {
+                var respuesta = await fetch('@Url.Action("ConciliadoresPorSede", "Expedientes")?idSede=' + encodeURIComponent(sede.value));
+                if (!respuesta.ok) throw new Error('No se pudo consultar la sede.');
+                var lista = await respuesta.json();
+                conciliador.innerHTML = '';
+                if (lista.length === 0) {
+                    conciliador.innerHTML = '<option value="">No hay conciliadores activos en esta sede</option>';
+                    return;
+                }
+
+                conciliador.appendChild(new Option('-- Selecciona conciliador --', ''));
+                lista.forEach(function (item) {
+                    conciliador.appendChild(new Option(item.nombreCompleto, item.idTrabajador));
+                });
+                conciliador.disabled = false;
+            } catch {
+                conciliador.innerHTML = '<option value="">Error al cargar conciliadores; vuelve a elegir la sede</option>';
+            }
+        });
+    })();
+</script>
+}
