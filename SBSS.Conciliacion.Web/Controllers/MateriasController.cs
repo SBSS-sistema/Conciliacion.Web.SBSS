@@ -5,7 +5,7 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize(Roles = "ADMINISTRADOR")]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
 public class MateriasController : Controller
 {
     private readonly IMateriaRepository _materias;
@@ -18,11 +18,13 @@ public class MateriasController : Controller
         return View(lista);
     }
 
+    [Authorize(Roles = "ADMINISTRADOR")]
     [HttpGet]
     public IActionResult CreateTipo() => View(new CrearTipoMateriaVm());
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> CreateTipo(CrearTipoMateriaVm vm)
     {
         if (!ModelState.IsValid) return View(vm);
@@ -32,6 +34,7 @@ public class MateriasController : Controller
         return RedirectToAction(nameof(Create));
     }
 
+    [Authorize(Roles = "ADMINISTRADOR")]
     [HttpGet]
     public async Task<IActionResult> Create()
     {
@@ -41,6 +44,7 @@ public class MateriasController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> Create(CrearMateriaVm vm)
     {
         if (!ModelState.IsValid)
@@ -54,6 +58,7 @@ public class MateriasController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Roles = "ADMINISTRADOR")]
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
@@ -72,6 +77,7 @@ public class MateriasController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> Edit(EditarMateriaVm vm)
     {
         if (!ModelState.IsValid)
@@ -85,6 +91,7 @@ public class MateriasController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Roles = "ADMINISTRADOR")]
     [HttpGet]
     public async Task<IActionResult> Delete(int id)
     {
@@ -96,6 +103,7 @@ public class MateriasController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> Delete(int id, IFormCollection form)
     {
         var exito = await _materias.EliminarMateriaAsync(id);
@@ -117,3 +125,4 @@ public class MateriasController : Controller
         ViewBag.Tipos = (await _materias.ListarTiposAsync()).ToList();
     }
 }
+
