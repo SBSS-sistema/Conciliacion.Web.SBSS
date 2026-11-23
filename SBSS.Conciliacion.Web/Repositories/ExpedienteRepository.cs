@@ -73,8 +73,8 @@ public class ExpedienteRepository : IExpedienteRepository
             throw new InvalidOperationException("El expediente no existe.");
         if (!esAdministrador && actual.IdConciliador != idTrabajadorActor)
             throw new UnauthorizedAccessException("Solo puedes trasladar un expediente que tienes asignado.");
-        if (actual.IdSede == vm.IdSedeDestino && actual.IdConciliador == vm.IdConciliadorNuevo)
-            throw new InvalidOperationException("El expediente ya está en esa sede con ese conciliador.");
+        if (actual.IdSede == vm.IdSedeDestino)
+            throw new InvalidOperationException("Elige una sede distinta a la sede actual del expediente.");
 
         var destinoValido = await conn.ExecuteScalarAsync<bool>("""
             SELECT EXISTS (
