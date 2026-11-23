@@ -5,7 +5,7 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize(Roles = "ADMINISTRADOR")]
+[Authorize(Roles = "ADMINISTRADOR,MESA_DE_PARTES")]
 public class SedesController : Controller
 {
     private readonly ISedeRepository _sedes;
@@ -18,11 +18,13 @@ public class SedesController : Controller
         return View(lista);
     }
 
+    [Authorize(Roles = "ADMINISTRADOR")]
     [HttpGet]
     public IActionResult Create() => View(new CrearSedeVm());
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> Create(CrearSedeVm vm)
     {
         if (!ModelState.IsValid) return View(vm);
@@ -32,6 +34,7 @@ public class SedesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Roles = "ADMINISTRADOR")]
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
@@ -43,6 +46,7 @@ public class SedesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> Edit(EditarSedeVm vm)
     {
         if (!ModelState.IsValid) return View(vm);
@@ -54,6 +58,7 @@ public class SedesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> CambiarEstado(CambiarEstadoSedeVm vm)
     {
         await _sedes.CambiarEstadoAsync(vm.IdSede, vm.EstadoSede);
@@ -61,3 +66,4 @@ public class SedesController : Controller
         return RedirectToAction(nameof(Index));
     }
 }
+
