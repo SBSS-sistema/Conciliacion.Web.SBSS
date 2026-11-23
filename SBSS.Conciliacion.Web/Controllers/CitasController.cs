@@ -15,16 +15,18 @@ public class CitasController : Controller
     private readonly INotificacionRepository _notificaciones;
     private readonly IPersonaRepository _personas;
     private readonly IMateriaRepository _materias;
+    private readonly ISedeRepository _sedes;
 
     public CitasController(ICitaRepository citas,
         IUsuarioRepository usuarios, INotificacionRepository notificaciones,
-        IPersonaRepository personas, IMateriaRepository materias)
+        IPersonaRepository personas, IMateriaRepository materias, ISedeRepository sedes)
     {
         _citas = citas;
         _usuarios = usuarios;
         _notificaciones = notificaciones;
         _personas = personas;
         _materias = materias;
+        _sedes = sedes;
     }
 
     public async Task<IActionResult> Index()
@@ -54,10 +56,14 @@ public class CitasController : Controller
         if (vm.FechaHora <= HoraLocal.AhoraPeru)
             ModelState.AddModelError(nameof(vm.FechaHora), "La cita debe programarse para una fecha futura.");
 
+        var sedesActivas = (await _sedes.ListarAsync(soloActivas: true)).ToList();
+        if (!sedesActivas.Any(s => s.IdSede == vm.IdSede))
+            ModelState.AddModelError(nameof(vm.IdSede), "Selecciona una sede activa.");
+
         var conciliador = (await _citas.ListarConciliadoresAsync())
-            .FirstOrDefault(t => t.IdTrabajador == vm.IdConciliador);
+            .FirstOrDefault(t => t.IdTrabajador == vm.IdConciliador && t.IdSedeRef == vm.IdSede);
         if (conciliador is null)
-            ModelState.AddModelError(nameof(vm.IdConciliador), "Selecciona un conciliador activo.");
+            ModelState.AddModelError(nameof(vm.IdConciliador), "Selecciona un conciliador activo asignado a la sede elegida.");
 
         var persona = await _personas.ObtenerPorIdAsync(vm.IdPersona);
         if (persona is null || !string.Equals(persona.EstadoPersona, "ACTIVO", StringComparison.OrdinalIgnoreCase))
@@ -197,6 +203,7 @@ public class CitasController : Controller
     private async Task CargarCatalogosCitaAsync()
     {
         ViewBag.Conciliadores = (await _citas.ListarConciliadoresAsync()).ToList();
+        ViewBag.Sedes = (await _sedes.ListarAsync(soloActivas: true)).ToList();
         ViewBag.Personas = (await _personas.ListarAsync())
             .Where(p => string.Equals(p.EstadoPersona, "ACTIVO", StringComparison.OrdinalIgnoreCase))
             .OrderBy(p => p.NombreCompleto)
