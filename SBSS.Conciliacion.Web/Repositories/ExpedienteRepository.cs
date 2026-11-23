@@ -57,6 +57,78 @@ public class ExpedienteRepository : IExpedienteRepository
         return await conn.ScalarProcAsync<int>("sp_Expediente_AsignarConciliadorAleatorio", new { idExpediente });
     }
 
+    public async Task TrasladarAsync(TrasladarExpedienteVm vm, int idTrabajadorActor, bool esAdministrador)
+    {
+        using var conn = _factory.CreateConnection();
+        using var transaction = conn.BeginTransaction();
+
+        var actual = await conn.QuerySingleOrDefaultAsync<ExpedienteAsignacionActual>("""
+            SELECT idsede AS IdSede, idconciliador AS IdConciliador
+            FROM public.expediente
+            WHERE idexpediente = @IdExpediente
+            FOR UPDATE;
+            """, new { vm.IdExpediente }, transaction);
+
+        if (actual is null)
+            throw new InvalidOperationException("El expediente no existe.");
+        if (!esAdministrador && actual.IdConciliador != idTrabajadorActor)
+            throw new UnauthorizedAccessException("Solo puedes trasladar un expediente que tienes asignado.");
+        if (actual.IdSede == vm.IdSedeDestino && actual.IdConciliador == vm.IdConciliadorNuevo)
+            throw new InvalidOperationException("El expediente ya está en esa sede con ese conciliador.");
+
+        var destinoValido = await conn.ExecuteScalarAsync<bool>("""
+            SELECT EXISTS (
+                SELECT 1
+                FROM public.trabajador t
+                JOIN public.usuario u ON u.idtrabajador = t.idtrabajador
+                WHERE t.idtrabajador = @IdConciliadorNuevo
+                  AND t.idsedeRef = @IdSedeDestino
+                  AND upper(coalesce(t.estadotrabajador, '')) = 'ACTIVO'
+                  AND upper(trim(coalesce(u.rol, ''))) = 'CONCILIADOR'
+            );
+            """, new { vm.IdConciliadorNuevo, vm.IdSedeDestino }, transaction);
+
+        if (!destinoValido)
+            throw new InvalidOperationException("El conciliador seleccionado no está activo en la sede de destino.");
+
+        var filas = await conn.ExecuteAsync("""
+            UPDATE public.expediente
+            SET idsede = @IdSedeDestino,
+                idconciliador = @IdConciliadorNuevo,
+                estadoproceso = CASE WHEN estadoproceso = 'REGISTRADO' THEN 'ASIGNADO' ELSE estadoproceso END
+            WHERE idexpediente = @IdExpediente;
+            """, new { vm.IdExpediente, vm.IdSedeDestino, vm.IdConciliadorNuevo }, transaction);
+
+        if (filas != 1)
+            throw new InvalidOperationException("No se pudo actualizar la sede y el conciliador del expediente.");
+
+        await conn.ExecuteAsync("""
+            INSERT INTO public.historial_traslado_expediente
+                (idexpediente, idsede_origen, idsede_destino, idconciliador_anterior,
+                 idconciliador_nuevo, idtrabajador_actor, motivo)
+            VALUES
+                (@IdExpediente, @IdSedeOrigen, @IdSedeDestino, @IdConciliadorAnterior,
+                 @IdConciliadorNuevo, @IdTrabajadorActor, @Motivo);
+            """, new
+        {
+            vm.IdExpediente,
+            IdSedeOrigen = actual.IdSede,
+            vm.IdSedeDestino,
+            IdConciliadorAnterior = actual.IdConciliador,
+            vm.IdConciliadorNuevo,
+            IdTrabajadorActor = idTrabajadorActor,
+            vm.Motivo
+        }, transaction);
+
+        transaction.Commit();
+    }
+
+    private sealed class ExpedienteAsignacionActual
+    {
+        public int? IdSede { get; set; }
+        public int? IdConciliador { get; set; }
+    }
+
     public async Task CambiarEstadoAsync(int idExpediente, string nuevoEstado)
     {
         using var conn = _factory.CreateConnection();
