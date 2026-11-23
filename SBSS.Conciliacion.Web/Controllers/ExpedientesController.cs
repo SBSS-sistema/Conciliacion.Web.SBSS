@@ -112,7 +112,7 @@ public class ExpedientesController : Controller
         detalle.Audiencias = (await _audiencias.ListarPorExpedienteAsync(id)).ToList();
         detalle.Archivos = (await _documentos.ListarArchivosPorExpedienteAsync(id)).ToList();
 
-        ViewBag.Personas = User.IsInRole("ADMINISTRADOR") ? (await _personas.ListarAsync()).ToList() : new List<PersonaListItem>();
+        ViewBag.Personas = User.IsInRole("ADMINISTRADOR") || User.IsInRole("CONCILIADOR") ? (await _personas.ListarAsync()).ToList() : new List<PersonaListItem>();
         ViewBag.Materias = (await _materias.ListarMateriasAsync()).ToList();
         return View(detalle);
     }
@@ -205,9 +205,10 @@ public class ExpedientesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "ADMINISTRADOR")]
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
     public async Task<IActionResult> AgregarPersona(AgregarPersonaExpedienteVm vm)
     {
+        if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
         if (!ModelState.IsValid || vm.IdPersona <= 0)
         {
             TempData["Error"] = "Selecciona una persona y un rol antes de vincular.";
