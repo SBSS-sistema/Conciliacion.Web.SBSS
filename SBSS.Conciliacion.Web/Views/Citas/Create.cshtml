@@ -1,0 +1,25 @@
+@model CrearCitaVm
+@{
+    ViewData["Title"] = "Agendar cita";
+    var conciliadores = ViewBag.Conciliadores as List<Trabajador> ?? new();
+}
+<div class="wrap page-head"><h1>Agendar cita</h1><p>Registra los datos de la persona y asigna la primera atención.</p></div>
+<div class="wrap"><div class="panel" style="max-width:760px;">
+<form asp-action="Create" method="post" class="form-sbss">
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 18px;">
+        <div><label asp-for="NombreCliente">Nombres</label><input asp-for="NombreCliente" class="form-control"/><span asp-validation-for="NombreCliente" class="text-danger"></span></div>
+        <div><label asp-for="DniCliente">DNI</label><input asp-for="DniCliente" class="form-control"/><span asp-validation-for="DniCliente" class="text-danger"></span></div>
+        <div><label asp-for="ApellidoPaterno">Apellido paterno</label><input asp-for="ApellidoPaterno" class="form-control"/></div>
+        <div><label asp-for="ApellidoMaterno">Apellido materno</label><input asp-for="ApellidoMaterno" class="form-control"/></div>
+        <div><label asp-for="Telefono">Teléfono</label><input asp-for="Telefono" class="form-control"/></div>
+        <div><label asp-for="Correo">Correo</label><input asp-for="Correo" class="form-control"/></div>
+    </div>
+    <label asp-for="Motivo">Motivo de consulta</label><textarea asp-for="Motivo" class="form-control" rows="3"></textarea>
+    <label asp-for="IdConciliador">Conciliador asignado</label>
+    <select asp-for="IdConciliador" class="form-control"><option value="">-- Selecciona --</option>@foreach (var t in conciliadores) { <option value="@t.IdTrabajador">@t.NombreCompleto</option> }</select>
+    <label asp-for="FechaHora">Fecha y hora</label><input asp-for="FechaHora" type="datetime-local" class="form-control" value="@Model.FechaHora.ToString("yyyy-MM-ddTHH:mm")"/>
+    <label asp-for="Observaciones">Observaciones (opcional)</label><textarea asp-for="Observaciones" class="form-control" rows="2"></textarea>
+    <div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">Guardar cita</button><a asp-action="Index" class="btn btn-ghost">Cancelar</a></div>
+</form></div></div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

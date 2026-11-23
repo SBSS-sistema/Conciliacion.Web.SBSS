@@ -15,10 +15,26 @@ public class UsuarioLogin
     public string? EstadoTrabajador { get; set; }
 }
 
+public class UsuarioAdminVm
+{
+    public int IdUsuario { get; set; }
+    public int IdTrabajador { get; set; }
+    public string Usuario { get; set; } = string.Empty;
+    public string? Correo { get; set; }
+    public string? NombreTrabajador { get; set; }
+    public string? Rol { get; set; }
+}
+
+public class CambiarRolUsuarioVm
+{
+    [Required] public int IdUsuario { get; set; }
+    [Required] public string Rol { get; set; } = string.Empty;
+}
+
 public class LoginVm
 {
     [Required(ErrorMessage = "Ingresa tu usuario.")]
-    [Display(Name = "Usuario")]
+    [Display(Name = "Usuario o correo")]
     public string Usuario { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Ingresa tu contraseña.")]

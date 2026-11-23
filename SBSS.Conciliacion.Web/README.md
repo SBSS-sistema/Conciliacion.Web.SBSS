@@ -6,10 +6,14 @@ conciliación extrajudicial del Centro de Conciliación Extrajudicial SBSS
 
 ## Arquitectura
 
-- **Acceso a datos**: Dapper puro sobre SQL Server. No hay Entity Framework:
-  cada repositorio en `/Repositories` llama directamente a un procedimiento
-  almacenado de `BD-SBSS-SP.sql` (`CommandType.StoredProcedure`), sin SQL
-  embebido en la aplicación.
+- **Acceso a datos en Render**: Dapper sobre PostgreSQL de Supabase mediante
+  `Npgsql`. `Data/PgProc.cs` adapta los nombres de RPC `sp_*` que usa la app a
+  funciones PostgreSQL. Citas y administración de roles usan SQL parametrizado
+  contra tablas PostgreSQL.
+- **Scripts SQL heredados**: `BD-SBSS-Completa.sql`, `BD-SBSS-SP.sql`, seed,
+  carga masiva y ubigeo contienen sintaxis T-SQL de SQL Server. Sirven para la
+  instalación SQL Server de desarrollo; **no se ejecutan en Supabase**. No son
+  una exportación del esquema Supabase que ya utiliza Render.
 - **Autenticación**: cookie de ASP.NET Core (`AddCookie`), validando contra
   `sp_Usuario_ObtenerParaLogin` + `BCrypt.Net` para el hash de contraseña.
 - **Tiempo real**: `Hubs/NotificacionesHub.cs` (SignalR) + un
@@ -23,45 +27,67 @@ conciliación extrajudicial del Centro de Conciliación Extrajudicial SBSS
   Poppins/Lora) y el logo real extraído de los PDF de marca, en
   `wwwroot/images`.
 
-## Puesta en marcha
+## Base de datos y despliegue
 
-1. Ejecutar en SQL Server, en este orden:
-   - `Database/BD-SBSS-Completa.sql` (esquema completo)
-   - `Database/BD-SBSS-SP.sql` (procedimientos almacenados)
-   - `Database/BD-SBSS-Seed.sql` (datos de prueba — sede, trabajadores y usuarios)
-2. Ajustar la cadena de conexión en `appsettings.Development.json`
-   (`ConnectionStrings:DefaultConnection`).
-3. `dotnet restore` y `dotnet run`, o abrir la solución en Visual Studio
-   2026 (requiere el SDK de .NET 10) y F5.
+El backend actual requiere PostgreSQL y se conecta a la base Supabase ya
+configurada. Para ejecutar localmente, configura `ConnectionStrings:DefaultConnection`
+como secreto de usuario o variable de entorno. La cadena nunca se guarda en Git.
 
-### Credenciales de prueba (creadas por `BD-SBSS-Seed.sql`)
+Los scripts `BD-SBSS-Completa.sql`, `BD-SBSS-SP.sql`, `BD-SBSS-Seed.sql`,
+`BD-SBSS-CargaMasiva.sql` y `BD-SBSS-Ubigeo.sql` son artefactos T-SQL del diseño
+SQL Server original. Se conservan como referencia, pero no crean ni actualizan
+el esquema que consume la aplicación actual en Supabase.
+
+### Producción existente en Render + Supabase
+
+- El backend sigue conectándose con `Npgsql`. Conserva en Render los valores
+  actuales de `ConnectionStrings__DefaultConnection`, `Supabase__Url`,
+  `Supabase__ServiceKey` y `Supabase__Bucket`; este cambio no los reemplaza.
+- La clave de Supabase Storage se queda en variables secretas de Render, nunca
+  en `appsettings.json` ni en GitHub. El servicio existente de Storage no se
+  modifica.
+- No ejecutes los scripts T-SQL heredados en el SQL Editor de Supabase. Para
+  esta funcionalidad, ejecuta una sola vez `Database/06_roles_citas_supabase.sql`
+  en Supabase. Antes de asignar roles, sigue con cuidado las instrucciones de
+  `Database/07_asegurar_administrador_supabase.sql` y confirma que tu cuenta
+  conserve `ADMINISTRADOR`.
+- La rama `feature/roles-citas` es para revisión. Render sigue desplegando su
+  rama configurada; estos cambios no llegan a producción hasta que tú los
+  integres según tu flujo habitual.
+
+Para desarrollo con el backend Supabase, la cadena de conexión local se
+configura como secreto de usuario o variable de entorno, no se guarda en Git.
+
+### Credenciales de ejemplo SQL Server
+
+Las siguientes credenciales las crea el seed SQL Server local; no se asume que
+existan en tu proyecto Supabase:
 
 | Usuario        | Contraseña           | Rol            |
 |----------------|-----------------------|----------------|
 | `admin`        | `Conciliacion2026!`   | ADMINISTRADOR  |
 | `conciliador1` | `Conciliacion2026!`   | CONCILIADOR    |
 
-Las contraseñas están guardadas como hash BCrypt (factor de costo 11) en la
-tabla `Usuario`, no en texto plano — el script `BD-SBSS-Seed.sql` ya trae el
-hash generado, no hace falta calcularlo a mano. `conciliador1` sirve para
-probar de punta a punta la asignación de expedientes y la programación de
-audiencias: ese trabajador es quien recibe la notificación real (por
-SignalR) cuando lo asignas desde la cuenta `admin`.
+Las contraseñas del seed están guardadas como hash BCrypt (factor de costo 11),
+no en texto plano.
 
-Para crear más usuarios manualmente más adelante (antes de tener el CRUD de
-Trabajadores), el hash se genera con `BCrypt.Net.BCrypt.HashPassword("tu-clave")`.
+<!-- Legacy setup text retained below only as historical reference. -->
+<!-- 2. Ajustar la cadena de conexión en `appsettings.Development.json`
+   (`ConnectionStrings:DefaultConnection`).
+-->
 
 ## Estructura
 
 ```
-Controllers/     HomeController, AccountController, ExpedientesController,
+Controllers/     HomeController, AccountController, UsuariosController, CitasController,
+                 ExpedientesController,
                  AudienciasController, DashboardController, NotificacionesController,
                  SedesController, TrabajadoresController, MateriasController,
                  PersonasController, CatalogosController (landing)
 Data/            Fábrica de conexiones (IDbConnectionFactory / SqlConnectionFactory)
 Hubs/            NotificacionesHub (SignalR)
 Models/          Entidades + ViewModels
-Repositories/    Un repositorio por módulo, cada método = un SP
+Repositories/    Repositorios por módulo; funciones PostgreSQL y SQL parametrizado
 Services/        Generación de .docx / Excel / PDF + job de alertas de vencimiento
 Views/           Razor views, con _Layout.cshtml de marca
 wwwroot/         css/site.css, js/site.js, images/ (logos y fotos de marca)
@@ -93,10 +119,9 @@ expediente (antes no existía forma de completar esas relaciones).
 - **Tipos aceptados**: DOCUMENTO (.pdf/.doc/.docx, 15 MB), IMAGEN
   (.jpg/.png/.webp, 15 MB), VIDEO (.mp4/.mov/.avi/.webm, 200 MB) y AUDIO
   (.mp3/.wav/.m4a, 50 MB) — límites en `TiposArchivoAdjunto` (Models/Documento.cs).
-- **Dónde se guardan**: en disco, fuera de `wwwroot` (para que no queden
-  servidos como estáticos sin control de acceso), bajo
-  `App_Data/uploads/{idExpediente}/` — configurable en
-  `appsettings.json` → `Almacenamiento:CarpetaArchivos`.
+- **Dónde se guardan**: en Supabase Storage cuando están configurados
+  `Supabase:Url`, `Supabase:ServiceKey` y `Supabase:Bucket`; el respaldo local
+  queda bajo `App_Data/uploads/{idExpediente}/` fuera de `wwwroot`.
 - **Seguridad**: `ArchivoAlmacenamientoService` nunca usa el nombre
   original del archivo para la ruta física (genera un GUID), valida
   extensión y tamaño según el tipo declarado, y la descarga
@@ -106,19 +131,28 @@ expediente (antes no existía forma de completar esas relaciones).
   en `Program.cs` (200 MB) hay que subir `maxAllowedContentLength` en
   `web.config`, porque IIS tiene su propio límite (~30 MB) independiente.
 
+### Roles y citas
+
+- **ADMINISTRADOR**: acceso completo, administración de usuarios y cambio de roles.
+- **MESA_PARTES**: registra, consulta, reprograma y cancela citas.
+- **CONCILIADOR**: consulta sus expedientes, citas y audiencias; registra asistencia
+  y convierte una cita atendida en expediente.
+- La conversión reutiliza las funciones PostgreSQL existentes para crear la persona
+  y el expediente, y enlaza ambos dentro de una transacción.
+- La migración aditiva `Database/06_roles_citas_supabase.sql` crea la tabla de citas.
+  Revisa `Database/07_asegurar_administrador_supabase.sql` para comprobar que exista
+  un administrador antes de publicar la nueva versión.
+
 ### Recuperación de contraseña
 
 `Account/OlvideContrasenia` → genera un token (`sp_PasswordResetToken_Generar`)
 y `Account/RestablecerContrasenia` lo valida y actualiza el hash
 (`sp_Usuario_ActualizarContrasenia` + `sp_PasswordResetToken_MarcarUsado`).
 
-El sistema no tiene un servicio de correo configurado (no estaba en el
-alcance original), así que en vez de enviar un email que no llegaría a
-ningún lado, el enlace de restablecimiento se muestra en pantalla para
-que el administrador se lo haga llegar al usuario. Para conectarlo a un
-correo real, basta con reemplazar esa pantalla por una llamada a un
-`IEmailSender` — el resto del flujo (token, expiración a los 30 minutos,
-un solo uso) ya está completo.
+El usuario puede solicitar un restablecimiento con una respuesta genérica.
+Como el sistema no tiene correo configurado, el administrador genera y comparte
+un enlace temporal de un solo uso desde la administración de usuarios. El token
+vence a los 30 minutos.
 
 ### Reportes
 

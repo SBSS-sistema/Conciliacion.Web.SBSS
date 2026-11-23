@@ -30,7 +30,7 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 // ---------------------------------------------------------------
-// Acceso a datos (Dapper sobre SQL Server, llamando a los SP)
+// Acceso a datos (Dapper sobre PostgreSQL/Supabase; PgProc adapta llamadas RPC existentes)
 // ---------------------------------------------------------------
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Falta la cadena de conexión 'DefaultConnection' en appsettings.json");
@@ -38,6 +38,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddSingleton<IDbConnectionFactory>(new SqlConnectionFactory(connectionString));
 
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+builder.Services.AddScoped<ICitaRepository, CitaRepository>();
 builder.Services.AddScoped<IExpedienteRepository, ExpedienteRepository>();
 builder.Services.AddScoped<IAudienciaRepository, AudienciaRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
@@ -70,10 +71,40 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     .AddCookie(options =>
     {
         options.LoginPath = "/Account/Login";
-        options.AccessDeniedPath = "/Account/Login";
+        options.AccessDeniedPath = "/Account/AccessDenied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
         options.Cookie.Name = "SBSS.Auth";
+        // Refresca el rol desde la base en cada solicitud para que un cambio
+        // administrativo no deje permisos antiguos vigentes hasta que venza la cookie.
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var idValue = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(idValue, out var idUsuario))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            var usuarios = context.HttpContext.RequestServices.GetRequiredService<IUsuarioRepository>();
+            var rolActual = await usuarios.ObtenerRolActivoAsync(idUsuario);
+            if (string.IsNullOrWhiteSpace(rolActual))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            var identity = (System.Security.Claims.ClaimsIdentity)context.Principal!.Identity!;
+            var rolClaims = identity.FindAll(System.Security.Claims.ClaimTypes.Role).ToList();
+            if (rolClaims.Count != 1 || rolClaims[0].Value != rolActual)
+            {
+                foreach (var claim in rolClaims) identity.RemoveClaim(claim);
+                identity.AddClaim(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, rolActual));
+                context.ShouldRenew = true;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();

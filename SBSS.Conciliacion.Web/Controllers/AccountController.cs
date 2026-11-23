@@ -19,10 +19,15 @@ public class AccountController : Controller
     public IActionResult Login(string? returnUrl = null)
     {
         if (User.Identity is { IsAuthenticated: true })
-            return RedirectToAction("Index", "Dashboard");
+            return User.IsInRole("ADMINISTRADOR")
+                ? RedirectToAction("Index", "Dashboard")
+                : RedirectToAction("Index", "Citas");
 
         return View(new LoginVm { ReturnUrl = returnUrl });
     }
+
+    [HttpGet]
+    public IActionResult AccessDenied() => View();
 
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -48,12 +53,19 @@ public class AccountController : Controller
             return View(vm);
         }
 
+        var rol = (usuario.Rol ?? "").Trim().ToUpperInvariant();
+        if (rol is not ("ADMINISTRADOR" or "CONCILIADOR" or "MESA_DE_PARTES"))
+        {
+            ModelState.AddModelError(string.Empty, "El usuario no tiene un rol habilitado. Contacta al administrador.");
+            return View(vm);
+        }
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, usuario.IdUsuario.ToString()),
             new(ClaimTypes.Name, $"{usuario.NombreTrabajador} {usuario.ApePaterTrabajador}"),
             new("idTrabajador", usuario.IdTrabajador.ToString()),
-            new(ClaimTypes.Role, usuario.Rol ?? "Trabajador")
+            new(ClaimTypes.Role, rol)
         };
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -62,7 +74,9 @@ public class AccountController : Controller
         if (!string.IsNullOrEmpty(vm.ReturnUrl) && Url.IsLocalUrl(vm.ReturnUrl))
             return Redirect(vm.ReturnUrl);
 
-        return RedirectToAction("Index", "Dashboard");
+        return rol == "ADMINISTRADOR"
+            ? RedirectToAction("Index", "Dashboard")
+            : RedirectToAction("Index", "Citas");
     }
 
     public async Task<IActionResult> Logout()
@@ -91,22 +105,10 @@ public class AccountController : Controller
     public async Task<IActionResult> OlvideContrasenia(OlvideContraseniaVm vm)
     {
         if (!ModelState.IsValid) return View(vm);
-
-        var usuario = await _usuarios.ObtenerParaLoginAsync(vm.Usuario);
-        if (usuario is null)
-        {
-            // No revelamos si el usuario existe o no: mismo mensaje en ambos casos.
-            TempData["Ok"] = "Si el usuario existe, se generó un enlace de restablecimiento.";
-            return RedirectToAction(nameof(Login));
-        }
-
-        var token = GenerarTokenSeguro();
-        await _usuarios.GenerarTokenResetAsync(usuario.IdUsuario, token, minutosValidez: 30);
-
-        var enlace = Url.Action(nameof(RestablecerContrasenia), "Account", new { token }, Request.Scheme);
-        ViewBag.Enlace = enlace;
-        ViewBag.Usuario = usuario.Usuario;
-        return View("EnlaceGenerado");
+        // El correo saliente no está configurado. El enlace solo lo genera un
+        // administrador desde Usuarios; esta pantalla pública nunca revela enlaces.
+        TempData["Ok"] = "Solicita al administrador que genere un enlace de restablecimiento.";
+        return RedirectToAction(nameof(Login));
     }
 
     [HttpGet]
@@ -143,9 +145,4 @@ public class AccountController : Controller
         return RedirectToAction(nameof(Login));
     }
 
-    private static string GenerarTokenSeguro()
-    {
-        var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
-        return Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
-    }
 }

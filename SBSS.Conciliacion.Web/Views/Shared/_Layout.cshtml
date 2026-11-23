@@ -26,20 +26,38 @@
     <div class="wrap nav">
         @if (User.Identity is { IsAuthenticated: true })
         {
-            <a asp-controller="Dashboard" asp-action="Index" class="brand">
-                <img src="~/images/logo-white.png" alt="Centro de Conciliación Extrajudicial SBSS">
-            </a>
+            @if (User.IsInRole("ADMINISTRADOR"))
+            {
+                <a asp-controller="Dashboard" asp-action="Index" class="brand"><img src="~/images/logo-white.png" alt="Centro de Conciliación Extrajudicial SBSS"></a>
+            }
+            else
+            {
+                <a asp-controller="Citas" asp-action="Index" class="brand"><img src="~/images/logo-white.png" alt="Centro de Conciliación Extrajudicial SBSS"></a>
+            }
 
             <nav class="nav-links" id="navLinks" aria-label="Principal">
-                <a asp-controller="Dashboard" asp-action="Index" class="@Activo("Dashboard", "Home")">Dashboard</a>
-                <a asp-controller="Expedientes" asp-action="Index" class="@Activo("Expedientes", "Audiencias")">Expedientes</a>
-                <a asp-controller="Calendario" asp-action="Index" class="@Activo("Calendario")">Calendario</a>
-                <a asp-controller="Reportes" asp-action="Index" class="@Activo("Reportes")">Reportes</a>
-                <a asp-controller="Catalogos" asp-action="Index" class="@Activo("Catalogos", "Sedes", "Trabajadores", "Materias", "Personas")">Catálogos</a>
+                @if (User.IsInRole("ADMINISTRADOR"))
+                {
+                    <a asp-controller="Dashboard" asp-action="Index" class="@Activo("Dashboard", "Home")">Dashboard</a>
+                }
+                <a asp-controller="Citas" asp-action="Index" class="@Activo("Citas")">Citas</a>
+                @if (User.IsInRole("ADMINISTRADOR") || User.IsInRole("CONCILIADOR"))
+                {
+                    <a asp-controller="Expedientes" asp-action="Index" class="@Activo("Expedientes", "Audiencias")">Expedientes</a>
+                    <a asp-controller="Calendario" asp-action="Index" class="@Activo("Calendario")">Calendario</a>
+                }
+                @if (User.IsInRole("ADMINISTRADOR"))
+                {
+                    <a asp-controller="Reportes" asp-action="Index" class="@Activo("Reportes")">Reportes</a>
+                    <a asp-controller="Catalogos" asp-action="Index" class="@Activo("Catalogos", "Sedes", "Trabajadores", "Materias", "Personas")">Catálogos</a>
+                    <a asp-controller="Usuarios" asp-action="Index" class="@Activo("Usuarios")">Usuarios</a>
+                }
             </nav>
 
             <div class="nav-cta">
                 <!-- La campana es el enlace a Notificaciones -->
+                @if (User.IsInRole("ADMINISTRADOR") || User.IsInRole("CONCILIADOR"))
+                {
                 <a asp-controller="Notificaciones"
                    asp-action="Index"
                    id="btnNotificaciones"
@@ -49,6 +67,7 @@
                     <span aria-hidden="true">🔔</span>
                     <span id="badgeNotificaciones" class="badge-count" hidden>0</span>
                 </a>
+                }
 
                 <span class="user-chip">
                     <span class="avatar" aria-hidden="true">@inicial</span>
