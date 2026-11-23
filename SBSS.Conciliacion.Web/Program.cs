@@ -64,7 +64,7 @@ builder.Services.AddScoped<IArchivoAlmacenamientoService, ArchivoAlmacenamientoS
 builder.Services.AddHttpClient<IDecolectaService, DecolectaService>();
 builder.Services.Configure<SBSS.Conciliacion.Web.Models.EmailLoginCodeOptions>(
     builder.Configuration.GetSection("Authentication:EmailCode"));
-builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>();
+builder.Services.AddTransient<IEmailSender, GmailSmtpEmailSender>();
 
 // Job en segundo plano: revisa vencimientos y notifica por SignalR (alternativa a un job de SQL Agent)
 builder.Services.AddHostedService<AlertaVencimientoBackgroundService>();
