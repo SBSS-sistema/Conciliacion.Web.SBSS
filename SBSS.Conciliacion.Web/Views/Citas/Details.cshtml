@@ -12,7 +12,7 @@
 <div>
 @if (puedeGestionarAgenda && Model.Estado is ("PROGRAMADA" or "REPROGRAMADA"))
 {
-<div class="panel"><h3>Reprogramar</h3><form asp-action="Reprogramar" method="post" class="form-sbss"><input type="hidden" name="id" value="@Model.IdCita"/><label>Nueva fecha y hora</label><input name="fechaHora" type="datetime-local" class="form-control" required/><label>Nota</label><textarea name="observaciones" class="form-control" rows="2">@Model.Observaciones</textarea><button class="btn btn-primary" type="submit">Guardar cambio</button></form><form asp-action="Cancelar" method="post" style="margin-top:12px;"><input type="hidden" name="id" value="@Model.IdCita"/><input type="hidden" name="observaciones" value="Cancelada por mesa de partes."/><button class="btn btn-danger" type="submit">Cancelar cita</button></form></div>
+<div class="panel"><h3>Reprogramar</h3><form asp-action="Reprogramar" method="post" class="form-sbss"><input type="hidden" name="id" value="@Model.IdCita"/><label>Nueva fecha y hora</label><input name="fechaHora" type="datetime-local" class="form-control" required/><label>Nota</label><textarea name="observaciones" class="form-control" rows="2">@Model.Observaciones</textarea><button class="btn btn-primary" type="submit">Guardar cambio</button></form><form asp-action="Cancelar" method="post" style="margin-top:12px;"><input type="hidden" name="id" value="@Model.IdCita"/><input type="hidden" name="observaciones" value="Cancelada por Asistente Administrativo."/><button class="btn btn-danger" type="submit">Cancelar cita</button></form></div>
 }
 @if (puedeAtender && Model.Estado is ("PROGRAMADA" or "REPROGRAMADA") && (User.IsInRole("ADMINISTRADOR") || Model.IdConciliador == int.Parse(User.FindFirst("idTrabajador")?.Value ?? "0")))
 {
