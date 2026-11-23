@@ -7,6 +7,8 @@ public class Cita
     public long IdCita { get; set; }
     public int? IdPersona { get; set; }
     public int? IdMateria { get; set; }
+    public int? IdSede { get; set; }
+    public string? NombreSede { get; set; }
     public string? NombreMateria { get; set; }
     public string NombreCliente { get; set; } = string.Empty;
     public string ApellidoPaterno { get; set; } = string.Empty;
@@ -30,6 +32,8 @@ public class CrearCitaVm
     public int IdPersona { get; set; }
     [Range(1, int.MaxValue, ErrorMessage = "Selecciona una materia.")]
     public int IdMateria { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Selecciona una sede.")]
+    public int IdSede { get; set; }
 
     public string NombreCliente { get; set; } = string.Empty;
     public string ApellidoPaterno { get; set; } = string.Empty;
