@@ -134,7 +134,7 @@ expediente (antes no existía forma de completar esas relaciones).
 ### Roles y citas
 
 - **ADMINISTRADOR**: acceso completo, administración de usuarios y cambio de roles.
-- **MESA_PARTES**: registra, consulta, reprograma y cancela citas.
+- **Asistente Administrativo** (clave interna `MESA_DE_PARTES`): administra personas, consulta sedes y materias, agenda/reprograma/cancela citas y consulta el calendario.
 - **CONCILIADOR**: consulta sus expedientes, citas y audiencias; registra asistencia
   y convierte una cita atendida en expediente.
 - La conversión reutiliza las funciones PostgreSQL existentes para crear la persona
