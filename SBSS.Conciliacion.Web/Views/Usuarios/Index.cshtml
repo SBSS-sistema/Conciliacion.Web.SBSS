@@ -12,8 +12,8 @@
         <thead><tr><th>Trabajador</th><th>Usuario</th><th>Correo</th><th>Rol</th><th>Actualizar rol</th><th>Contraseña</th></tr></thead>
         <tbody>@foreach (var u in Model)
         {
-            <tr><td>@u.NombreTrabajador</td><td>@u.Usuario</td><td>@(u.Correo ?? "—")</td><td>@u.Rol</td>
-                <td><form asp-action="CambiarRol" method="post" style="display:flex;gap:8px;align-items:center;"><input type="hidden" name="IdUsuario" value="@u.IdUsuario"/><select name="Rol" class="form-control" style="margin:0;min-width:170px;"><option value="ADMINISTRADOR" selected="@(u.Rol == "ADMINISTRADOR")">Administrador</option><option value="CONCILIADOR" selected="@(u.Rol == "CONCILIADOR")">Conciliador</option><option value="MESA_DE_PARTES" selected="@(u.Rol == "MESA_DE_PARTES")">Mesa de partes</option></select><button class="btn btn-ghost" type="submit">Guardar</button></form></td>
+            <tr><td>@u.NombreTrabajador</td><td>@u.Usuario</td><td>@(u.Correo ?? "—")</td><td>@(u.Rol == "MESA_DE_PARTES" ? "Asistente Administrativo" : u.Rol)</td>
+                <td><form asp-action="CambiarRol" method="post" style="display:flex;gap:8px;align-items:center;"><input type="hidden" name="IdUsuario" value="@u.IdUsuario"/><select name="Rol" class="form-control" style="margin:0;min-width:170px;"><option value="ADMINISTRADOR" selected="@(u.Rol == "ADMINISTRADOR")">Administrador</option><option value="CONCILIADOR" selected="@(u.Rol == "CONCILIADOR")">Conciliador</option><option value="MESA_DE_PARTES" selected="@(u.Rol == "MESA_DE_PARTES")">Asistente Administrativo</option></select><button class="btn btn-ghost" type="submit">Guardar</button></form></td>
                 <td><form asp-action="GenerarRestablecimiento" method="post"><input type="hidden" name="idUsuario" value="@u.IdUsuario"/><button class="btn btn-ghost" type="submit">Generar enlace</button></form></td>
             </tr>
         }</tbody>
