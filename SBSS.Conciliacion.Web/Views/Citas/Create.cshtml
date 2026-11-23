@@ -2,24 +2,93 @@
 @{
     ViewData["Title"] = "Agendar cita";
     var conciliadores = ViewBag.Conciliadores as List<Trabajador> ?? new();
+    var personas = ViewBag.Personas as List<PersonaListItem> ?? new();
+    var materias = ViewBag.Materias as List<Materia> ?? new();
 }
-<div class="wrap page-head"><h1>Agendar cita</h1><p>Registra los datos de la persona y asigna la primera atención.</p></div>
+<div class="wrap page-head"><h1>Agendar cita</h1><p>Selecciona una persona registrada, la materia y el conciliador para programar su primera atención.</p></div>
 <div class="wrap"><div class="panel" style="max-width:760px;">
 <form asp-action="Create" method="post" class="form-sbss">
     <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 18px;">
-        <div><label asp-for="NombreCliente">Nombres</label><input asp-for="NombreCliente" class="form-control"/><span asp-validation-for="NombreCliente" class="text-danger"></span></div>
-        <div><label asp-for="DniCliente">DNI</label><input asp-for="DniCliente" class="form-control"/><span asp-validation-for="DniCliente" class="text-danger"></span></div>
-        <div><label asp-for="ApellidoPaterno">Apellido paterno</label><input asp-for="ApellidoPaterno" class="form-control"/></div>
-        <div><label asp-for="ApellidoMaterno">Apellido materno</label><input asp-for="ApellidoMaterno" class="form-control"/></div>
-        <div><label asp-for="Telefono">Teléfono</label><input asp-for="Telefono" class="form-control"/></div>
-        <div><label asp-for="Correo">Correo</label><input asp-for="Correo" class="form-control"/></div>
+
+    <label asp-for="IdPersona">Persona solicitante</label>
+    <select asp-for="IdPersona" class="form-control" id="IdPersona">
+        <option value="">-- Buscar y seleccionar persona --</option>
+        @foreach (var p in personas)
+        {
+            <option value="@p.IdPersona"
+                    data-nombre="@p.NombreCompleto"
+                    data-documento="@p.Documento"
+                    data-tipo="@(p.TipoPersona == "NATURAL" ? "Persona natural" : "Persona jurídica")"
+                    data-contacto="@(p.CelularP ?? p.CorreoP ?? "Sin contacto registrado")">
+                @p.NombreCompleto · @(p.TipoPersona == "NATURAL" ? "Natural" : "Jurídica") · @p.Documento
+            </option>
+        }
+    </select>
+    <span asp-validation-for="IdPersona" class="text-danger"></span>
+    <div id="personaSeleccionada" class="panel" style="padding:12px 16px;margin:0 0 16px;display:none;">
+        <strong id="personaNombre"></strong>
+        <span id="personaTipo" style="margin-left:8px;color:#4a5a61;"></span><br />
+        <span id="personaDocumento"></span> · <span id="personaContacto"></span>
     </div>
-    <label asp-for="Motivo">Motivo de consulta</label><textarea asp-for="Motivo" class="form-control" rows="3"></textarea>
+    @if (personas.Count == 0)
+    {
+        <p class="text-danger">No hay personas activas registradas. Registra primero a la persona en el módulo Personas.</p>
+    }
+
+    <label asp-for="IdMateria">Materia de consulta</label>
+    <select asp-for="IdMateria" class="form-control">
+        <option value="">-- Selecciona una materia --</option>
+        @foreach (var materia in materias)
+        {
+            <option value="@materia.IdMateria">@materia.NombreMateria</option>
+        }
+    </select>
+    <span asp-validation-for="IdMateria" class="text-danger"></span>
+
+    <label asp-for="Motivo">Motivo o detalle de consulta</label>
+    <textarea asp-for="Motivo" class="form-control" rows="3"></textarea>
+    <span asp-validation-for="Motivo" class="text-danger"></span>
+
     <label asp-for="IdConciliador">Conciliador asignado</label>
-    <select asp-for="IdConciliador" class="form-control"><option value="">-- Selecciona --</option>@foreach (var t in conciliadores) { <option value="@t.IdTrabajador">@t.NombreCompleto</option> }</select>
-    <label asp-for="FechaHora">Fecha y hora</label><input asp-for="FechaHora" type="datetime-local" class="form-control" value="@Model.FechaHora.ToString("yyyy-MM-ddTHH:mm")"/>
-    <label asp-for="Observaciones">Observaciones (opcional)</label><textarea asp-for="Observaciones" class="form-control" rows="2"></textarea>
-    <div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">Guardar cita</button><a asp-action="Index" class="btn btn-ghost">Cancelar</a></div>
+    <select asp-for="IdConciliador" class="form-control">
+        <option value="">-- Selecciona conciliador --</option>
+        @foreach (var t in conciliadores)
+        {
+            <option value="@t.IdTrabajador">@t.NombreCompleto</option>
+        }
+    </select>
+    <span asp-validation-for="IdConciliador" class="text-danger"></span>
+
+    <label asp-for="FechaHora">Fecha y hora</label>
+    <input asp-for="FechaHora" type="datetime-local" class="form-control" value="@Model.FechaHora.ToString("yyyy-MM-ddTHH:mm")" />
+    <span asp-validation-for="FechaHora" class="text-danger"></span>
+
+    <label asp-for="Observaciones">Observaciones (opcional)</label>
+    <textarea asp-for="Observaciones" class="form-control" rows="2"></textarea>
+
+    <div style="display:flex;gap:12px;">
+        <button type="submit" class="btn btn-primary" disabled="@(personas.Count == 0 || materias.Count == 0)">Guardar cita</button>
+        <a asp-action="Index" class="btn btn-ghost">Cancelar</a>
+    </div>
 </form></div></div>
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const select = document.getElementById("IdPersona");
+            const panel = document.getElementById("personaSeleccionada");
+            const update = () => {
+                const option = select.options[select.selectedIndex];
+                const selected = option && option.value;
+                panel.style.display = selected ? "block" : "none";
+                if (!selected) return;
+                document.getElementById("personaNombre").textContent = option.dataset.nombre || "";
+                document.getElementById("personaTipo").textContent = option.dataset.tipo || "";
+                document.getElementById("personaDocumento").textContent = "Documento: " + (option.dataset.documento || "—");
+                document.getElementById("personaContacto").textContent = option.dataset.contacto || "";
+            };
+            select.addEventListener("change", update);
+            update();
+        })();
+    </script>
+}
