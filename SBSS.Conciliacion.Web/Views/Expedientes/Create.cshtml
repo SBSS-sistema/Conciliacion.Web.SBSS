@@ -3,6 +3,8 @@
     ViewData["Title"] = "Registrar expediente";
     var sedes = ViewBag.Sedes as List<Sede> ?? new();
     var trabajadores = ViewBag.Trabajadores as List<Trabajador> ?? new();
+    var trabajadorActual = ViewBag.TrabajadorActual as Trabajador;
+    var esAdministrador = User.IsInRole("ADMINISTRADOR");
 }
 
 <div class="wrap page-head">
@@ -19,14 +21,23 @@
             <input asp-for="NumeroExpediente" class="form-control" placeholder="Ej. EXP-2026-000123" />
             <span asp-validation-for="NumeroExpediente" class="text-danger"></span>
 
-            <label asp-for="IdTrabajador"></label>
-            <select asp-for="IdTrabajador" class="form-control">
-                <option value="">-- Selecciona --</option>
-                @foreach (var t in trabajadores)
-                {
-                    <option value="@t.IdTrabajador">@t.NombreCompleto</option>
-                }
-            </select>
+            @if (esAdministrador)
+            {
+                <label asp-for="IdTrabajador"></label>
+                <select asp-for="IdTrabajador" class="form-control">
+                    <option value="">-- Selecciona --</option>
+                    @foreach (var t in trabajadores)
+                    {
+                        <option value="@t.IdTrabajador">@t.NombreCompleto</option>
+                    }
+                </select>
+            }
+            else
+            {
+                <label>Trabajador que registra</label>
+                <input type="text" class="form-control" value="@(trabajadorActual?.NombreCompleto ?? User.Identity?.Name)" readonly />
+                <input asp-for="IdTrabajador" type="hidden" />
+            }
             <span asp-validation-for="IdTrabajador" class="text-danger"></span>
 
             <label asp-for="IdSede"></label>
@@ -49,7 +60,14 @@
 
             <div style="display:flex;gap:12px;margin-top:10px;">
                 <button type="submit" class="btn btn-primary">Registrar expediente</button>
-                <a asp-action="Index" class="btn btn-ghost">Cancelar</a>
+                @if (User.IsInRole("MESA_DE_PARTES"))
+                {
+                    <a asp-action="Create" class="btn btn-ghost">Cancelar</a>
+                }
+                else
+                {
+                    <a asp-action="Index" class="btn btn-ghost">Cancelar</a>
+                }
             </div>
         </form>
     </div>
@@ -58,3 +76,4 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }
+
