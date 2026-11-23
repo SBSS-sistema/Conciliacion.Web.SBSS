@@ -82,6 +82,22 @@ public class MateriaExpedienteVm
     public string? DescripcionDtMateria { get; set; }
 }
 
+public class TrasladarExpedienteVm
+{
+    [Required]
+    public int IdExpediente { get; set; }
+
+    [Range(1, int.MaxValue, ErrorMessage = "Selecciona una sede de destino.")]
+    public int IdSedeDestino { get; set; }
+
+    [Range(1, int.MaxValue, ErrorMessage = "Selecciona un conciliador de la sede elegida.")]
+    public int IdConciliadorNuevo { get; set; }
+
+    [Required(ErrorMessage = "Indica el motivo del traslado.")]
+    [StringLength(500)]
+    public string Motivo { get; set; } = string.Empty;
+}
+
 public class CambiarEstadoVm
 {
     [Required]
