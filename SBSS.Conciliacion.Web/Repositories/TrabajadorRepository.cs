@@ -61,4 +61,22 @@ public class TrabajadorRepository : ITrabajadorRepository
         using var conn = _factory.CreateConnection();
         return await conn.QueryProcAsync<Trabajador>("sp_Trabajador_Listar", new { idSedeRef, soloActivos });
     }
+
+    public async Task<IEnumerable<Trabajador>> ListarConciliadoresActivosPorSedeAsync(int idSede)
+    {
+        using var conn = _factory.CreateConnection();
+        return await conn.QueryAsync<Trabajador>("""
+            SELECT DISTINCT t.idtrabajador AS IdTrabajador, t.idsedeRef AS IdSedeRef,
+                   t.nombretrabajador AS NombreTrabajador, t.apepatertrabajador AS ApePaterTrabajador,
+                   t.apematertrabajador AS ApeMaterTrabajador
+            FROM public.trabajador t
+            JOIN public.usuario u ON u.idtrabajador = t.idtrabajador
+            JOIN public.sede s ON s.idsede = t.idsedeRef
+            WHERE t.idsedeRef = @idSede
+              AND upper(coalesce(t.estadotrabajador, '')) = 'ACTIVO'
+              AND upper(coalesce(s.estadosede, '')) = 'ACTIVO'
+              AND upper(trim(coalesce(u.rol, ''))) = 'CONCILIADOR'
+            ORDER BY t.nombretrabajador, t.apepatertrabajador, t.apematertrabajador;
+            """, new { idSede });
+    }
 }
