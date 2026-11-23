@@ -103,10 +103,11 @@ public class CitaRepository : ICitaRepository
                    c.motivo AS Motivo, c.id_conciliador AS IdConciliador,
                    c.id_usuario_creador AS IdUsuarioCreador, c.fecha_hora AS FechaHora,
                    c.estado AS Estado, c.observaciones AS Observaciones,
-                   c.id_expediente AS IdExpediente,
+                   c.id_expediente AS IdExpediente, m.nombremateria AS NombreMateria,
                    concat_ws(' ', t.nombretrabajador, t.apepatertrabajador) AS Conciliador
             FROM public.cita c
             JOIN public.trabajador t ON t.idtrabajador = c.id_conciliador
+            LEFT JOIN public.materia m ON m.idmateria = c.id_materia
             WHERE c.idcita = @IdCita;
             """;
         return await conn.QuerySingleOrDefaultAsync<Cita>(sql, new { IdCita = idCita });
