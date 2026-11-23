@@ -110,7 +110,28 @@ public class CitaRepository : ICitaRepository
             LEFT JOIN public.materia m ON m.idmateria = c.id_materia
             WHERE c.idcita = @IdCita;
             """;
-        return await conn.QuerySingleOrDefaultAsync<Cita>(sql, new { IdCita = idCita });
+        try
+        {
+            return await conn.QuerySingleOrDefaultAsync<Cita>(sql, new { IdCita = idCita });
+        }
+        catch (PostgresException ex) when (ex.SqlState is "42703" or "42P01")
+        {
+            // Compatibilidad temporal para citas antiguas mientras se aplica la migración 09.
+            const string sqlAnterior = """
+                SELECT c.idcita AS IdCita, c.nombre_cliente AS NombreCliente,
+                       c.apellido_paterno AS ApellidoPaterno, c.apellido_materno AS ApellidoMaterno,
+                       c.dni_cliente AS DniCliente, c.telefono AS Telefono, c.correo AS Correo,
+                       c.motivo AS Motivo, c.id_conciliador AS IdConciliador,
+                       c.id_usuario_creador AS IdUsuarioCreador, c.fecha_hora AS FechaHora,
+                       c.estado AS Estado, c.observaciones AS Observaciones,
+                       c.id_expediente AS IdExpediente,
+                       concat_ws(' ', t.nombretrabajador, t.apepatertrabajador) AS Conciliador
+                FROM public.cita c
+                JOIN public.trabajador t ON t.idtrabajador = c.id_conciliador
+                WHERE c.idcita = @IdCita;
+                """;
+            return await conn.QuerySingleOrDefaultAsync<Cita>(sqlAnterior, new { IdCita = idCita });
+        }
     }
 
     public async Task ActualizarAgendaAsync(long idCita, DateTime fechaHora, string? observaciones, string estado)
