@@ -114,6 +114,7 @@ public class ExpedientesController : Controller
 
         ViewBag.Personas = User.IsInRole("ADMINISTRADOR") || User.IsInRole("CONCILIADOR") ? (await _personas.ListarAsync()).ToList() : new List<PersonaListItem>();
         ViewBag.Materias = (await _materias.ListarMateriasAsync()).ToList();
+        ViewBag.SedesTraslado = (await _sedes.ListarAsync(soloActivas: true)).ToList();
         return View(detalle);
     }
 
@@ -190,6 +191,71 @@ public class ExpedientesController : Controller
         return RedirectToAction(nameof(Details), new { id = idExpediente });
     }
 
+    [HttpGet]
+    public async Task<IActionResult> ConciliadoresPorSede(int idSede)
+    {
+        if (idSede <= 0) return BadRequest();
+        var conciliadores = await _trabajadores.ListarConciliadoresActivosPorSedeAsync(idSede);
+        return Json(conciliadores.Select(t => new { t.IdTrabajador, t.NombreCompleto }));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
+    public async Task<IActionResult> TrasladarSede(TrasladarExpedienteVm vm)
+    {
+        if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Selecciona la sede y un conciliador activo de esa sede, e indica el motivo.";
+            return RedirectToAction(nameof(Details), new { id = vm.IdExpediente });
+        }
+
+        var detalleAnterior = await _expedientes.ObtenerPorIdAsync(vm.IdExpediente);
+        var idTrabajadorActor = IdTrabajadorActual();
+        if (idTrabajadorActor <= 0) return Forbid();
+
+        try
+        {
+            await _expedientes.TrasladarAsync(vm, idTrabajadorActor, User.IsInRole("ADMINISTRADOR"));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Details), new { id = vm.IdExpediente });
+        }
+
+        var idUsuarioNuevo = await _usuarios.ObtenerIdUsuarioPorTrabajadorAsync(vm.IdConciliadorNuevo);
+        if (idUsuarioNuevo.HasValue)
+        {
+            await _notificaciones.CrearAsync(
+                idUsuarioNuevo.Value,
+                vm.IdExpediente,
+                "ASIGNACION",
+                $"Se te trasladó el expediente {detalleAnterior?.Expediente.NumeroExpediente} desde otra sede. Conserva su historial y archivos.");
+        }
+
+        if (detalleAnterior?.Expediente.IdConciliador is int idConciliadorAnterior
+            && idConciliadorAnterior != vm.IdConciliadorNuevo)
+        {
+            var idUsuarioAnterior = await _usuarios.ObtenerIdUsuarioPorTrabajadorAsync(idConciliadorAnterior);
+            if (idUsuarioAnterior.HasValue)
+            {
+                await _notificaciones.CrearAsync(
+                    idUsuarioAnterior.Value,
+                    vm.IdExpediente,
+                    "REASIGNACION",
+                    $"El expediente {detalleAnterior.Expediente.NumeroExpediente} se trasladó a otra sede y fue asignado a otro conciliador.");
+            }
+        }
+
+        TempData["Ok"] = "El expediente se trasladó y quedó asignado al conciliador de la nueva sede. Sus personas, audiencias y archivos se conservaron.";
+        return RedirectToAction(nameof(Details), new { id = vm.IdExpediente });
+    }
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
