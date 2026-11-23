@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = "Personas";
     var busqueda = ViewBag.Busqueda as string;
-    var puedeRegistrar = User.IsInRole("ADMINISTRADOR") || User.IsInRole("MESA_DE_PARTES");
+    var puedeRegistrar = User.IsInRole("ADMINISTRADOR") || User.IsInRole("MESA_DE_PARTES") || User.IsInRole("CONCILIADOR");
 }
 
 <div class="wrap page-head" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;">
