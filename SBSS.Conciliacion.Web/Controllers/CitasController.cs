@@ -13,13 +13,18 @@ public class CitasController : Controller
     private readonly ICitaRepository _citas;
     private readonly IUsuarioRepository _usuarios;
     private readonly INotificacionRepository _notificaciones;
+    private readonly IPersonaRepository _personas;
+    private readonly IMateriaRepository _materias;
 
     public CitasController(ICitaRepository citas,
-        IUsuarioRepository usuarios, INotificacionRepository notificaciones)
+        IUsuarioRepository usuarios, INotificacionRepository notificaciones,
+        IPersonaRepository personas, IMateriaRepository materias)
     {
         _citas = citas;
         _usuarios = usuarios;
         _notificaciones = notificaciones;
+        _personas = personas;
+        _materias = materias;
     }
 
     public async Task<IActionResult> Index()
@@ -38,7 +43,7 @@ public class CitasController : Controller
     [HttpGet]
     public async Task<IActionResult> Create()
     {
-        await CargarConciliadoresAsync();
+        await CargarCatalogosCitaAsync();
         return View(new CrearCitaVm { FechaHora = HoraLocal.AhoraPeru.AddDays(1) });
     }
 
@@ -48,13 +53,34 @@ public class CitasController : Controller
     {
         if (vm.FechaHora <= HoraLocal.AhoraPeru)
             ModelState.AddModelError(nameof(vm.FechaHora), "La cita debe programarse para una fecha futura.");
-        var conciliador = (await _citas.ListarConciliadoresAsync()).FirstOrDefault(t => t.IdTrabajador == vm.IdConciliador);
+
+        var conciliador = (await _citas.ListarConciliadoresAsync())
+            .FirstOrDefault(t => t.IdTrabajador == vm.IdConciliador);
         if (conciliador is null)
             ModelState.AddModelError(nameof(vm.IdConciliador), "Selecciona un conciliador activo.");
 
+        var persona = await _personas.ObtenerPorIdAsync(vm.IdPersona);
+        if (persona is null || !string.Equals(persona.EstadoPersona, "ACTIVO", StringComparison.OrdinalIgnoreCase))
+            ModelState.AddModelError(nameof(vm.IdPersona), "Selecciona una persona activa del módulo Personas.");
+        else
+        {
+            vm.NombreCliente = persona.TipoPersona == "NATURAL"
+                ? persona.NombrePersonaN ?? string.Empty
+                : persona.RazonSocial ?? string.Empty;
+            vm.ApellidoPaterno = persona.ApellidoPaternoPersonaN ?? string.Empty;
+            vm.ApellidoMaterno = persona.ApellidoMaternoPersonaN ?? string.Empty;
+            vm.DniCliente = persona.Documento;
+            vm.Telefono = persona.CelularP;
+            vm.Correo = persona.CorreoP;
+        }
+
+        var materia = await _materias.ObtenerMateriaPorIdAsync(vm.IdMateria);
+        if (materia is null)
+            ModelState.AddModelError(nameof(vm.IdMateria), "Selecciona una materia registrada.");
+
         if (!ModelState.IsValid)
         {
-            await CargarConciliadoresAsync();
+            await CargarCatalogosCitaAsync();
             return View(vm);
         }
 
@@ -168,8 +194,15 @@ public class CitasController : Controller
         return User.IsInRole("CONCILIADOR") && cita.IdConciliador != IdTrabajadorActual() ? null : cita;
     }
 
-    private async Task CargarConciliadoresAsync() =>
+    private async Task CargarCatalogosCitaAsync()
+    {
         ViewBag.Conciliadores = (await _citas.ListarConciliadoresAsync()).ToList();
+        ViewBag.Personas = (await _personas.ListarAsync())
+            .Where(p => string.Equals(p.EstadoPersona, "ACTIVO", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(p => p.NombreCompleto)
+            .ToList();
+        ViewBag.Materias = (await _materias.ListarMateriasAsync()).ToList();
+    }
 
     private int IdUsuarioActual() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
     private int IdTrabajadorActual() => int.Parse(User.FindFirstValue("idTrabajador") ?? "0");
