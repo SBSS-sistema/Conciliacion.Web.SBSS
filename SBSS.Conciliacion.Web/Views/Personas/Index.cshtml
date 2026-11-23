@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = "Personas";
     var busqueda = ViewBag.Busqueda as string;
-    var esAdministrador = User.IsInRole("ADMINISTRADOR");
+    var puedeRegistrar = User.IsInRole("ADMINISTRADOR") || User.IsInRole("MESA_DE_PARTES");
 }
 
 <div class="wrap page-head" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;">
@@ -10,7 +10,7 @@
         <h1>Personas</h1>
         <p>Personas naturales y jurídicas registradas (solicitantes, invitados, apoderados...).</p>
     </div>
-    @if (esAdministrador)
+    @if (puedeRegistrar)
     {
         <div style="display:flex;gap:12px;">
             <a asp-action="CreateNatural" class="btn btn-ghost">+ Persona natural</a>
