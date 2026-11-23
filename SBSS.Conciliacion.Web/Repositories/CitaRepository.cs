@@ -18,16 +18,16 @@ public class CitaRepository : ICitaRepository
         using var conn = _factory.CreateConnection();
         const string sql = """
             INSERT INTO public.cita
-                (id_persona, id_materia, nombre_cliente, apellido_paterno, apellido_materno, dni_cliente,
+                (id_persona, id_materia, id_sede, nombre_cliente, apellido_paterno, apellido_materno, dni_cliente,
                  telefono, correo, motivo, id_conciliador, id_usuario_creador, fecha_hora, observaciones)
             VALUES
-                (@IdPersona, @IdMateria, @NombreCliente, @ApellidoPaterno, @ApellidoMaterno, @DniCliente,
+                (@IdPersona, @IdMateria, @IdSede, @NombreCliente, @ApellidoPaterno, @ApellidoMaterno, @DniCliente,
                  @Telefono, @Correo, @Motivo, @IdConciliador, @IdUsuarioCreador, @FechaHora, @Observaciones)
             RETURNING idcita;
             """;
         return await conn.ExecuteScalarAsync<long>(sql, new
         {
-            vm.IdPersona, vm.IdMateria, vm.NombreCliente, vm.ApellidoPaterno, vm.ApellidoMaterno,
+            vm.IdPersona, vm.IdMateria, vm.IdSede, vm.NombreCliente, vm.ApellidoPaterno, vm.ApellidoMaterno,
             vm.DniCliente, vm.Telefono, vm.Correo, vm.Motivo, vm.IdConciliador,
             IdUsuarioCreador = idUsuarioCreador,
             FechaHora = DateTime.SpecifyKind(vm.FechaHora, DateTimeKind.Unspecified),
@@ -97,17 +97,18 @@ public class CitaRepository : ICitaRepository
         using var conn = _factory.CreateConnection();
         const string sql = """
             SELECT c.idcita AS IdCita, c.id_persona AS IdPersona, c.id_materia AS IdMateria,
-                   c.nombre_cliente AS NombreCliente,
+                   c.id_sede AS IdSede, c.nombre_cliente AS NombreCliente,
                    c.apellido_paterno AS ApellidoPaterno, c.apellido_materno AS ApellidoMaterno,
                    c.dni_cliente AS DniCliente, c.telefono AS Telefono, c.correo AS Correo,
                    c.motivo AS Motivo, c.id_conciliador AS IdConciliador,
                    c.id_usuario_creador AS IdUsuarioCreador, c.fecha_hora AS FechaHora,
                    c.estado AS Estado, c.observaciones AS Observaciones,
-                   c.id_expediente AS IdExpediente, m.nombremateria AS NombreMateria,
+                   c.id_expediente AS IdExpediente, m.nombremateria AS NombreMateria, s.nombresede AS NombreSede,
                    concat_ws(' ', t.nombretrabajador, t.apepatertrabajador) AS Conciliador
             FROM public.cita c
             JOIN public.trabajador t ON t.idtrabajador = c.id_conciliador
             LEFT JOIN public.materia m ON m.idmateria = c.id_materia
+            LEFT JOIN public.sede s ON s.idsede = c.id_sede
             WHERE c.idcita = @IdCita;
             """;
         try
@@ -181,7 +182,7 @@ public class CitaRepository : ICitaRepository
         {
             const string citaSql = """
                 SELECT idcita AS IdCita, id_persona AS IdPersona, id_materia AS IdMateria,
-                       nombre_cliente AS NombreCliente,
+                       id_sede AS IdSede, nombre_cliente AS NombreCliente,
                        apellido_paterno AS ApellidoPaterno, apellido_materno AS ApellidoMaterno,
                        dni_cliente AS DniCliente, telefono AS Telefono, correo AS Correo,
                        motivo AS Motivo, id_conciliador AS IdConciliador, estado AS Estado,
@@ -194,9 +195,13 @@ public class CitaRepository : ICitaRepository
             if (cita.Estado != "ATENDIDA" || cita.IdExpediente.HasValue)
                 throw new InvalidOperationException("Solo se puede convertir una cita atendida y aún no convertida.");
 
-            var idSede = await pg.ExecuteScalarAsync<int?>(
-                "SELECT idsederef FROM public.trabajador WHERE idtrabajador = @IdTrabajador AND upper(estadotrabajador) = 'ACTIVO';",
-                new { IdTrabajador = idConciliador }, tx);
+            int? idSede = cita.IdSede;
+            if (!idSede.HasValue)
+            {
+                idSede = await pg.ExecuteScalarAsync<int?>(
+                    "SELECT idsederef FROM public.trabajador WHERE idtrabajador = @IdTrabajador AND upper(estadotrabajador) = 'ACTIVO';",
+                    new { IdTrabajador = idConciliador }, tx);
+            }
             if (!idSede.HasValue)
                 throw new InvalidOperationException("El conciliador no tiene una sede activa asignada.");
 
