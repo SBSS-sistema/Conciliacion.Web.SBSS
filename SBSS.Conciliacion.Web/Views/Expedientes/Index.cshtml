@@ -10,11 +10,14 @@
         <h1>Expedientes</h1>
         <p>Registro y seguimiento de casos de conciliación.</p>
     </div>
-    @if (User.IsInRole("ADMINISTRADOR"))
+    @if (User.IsInRole("ADMINISTRADOR") || User.IsInRole("CONCILIADOR"))
     {
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            <a asp-action="ExportarExcel" asp-route-estado="@filtro.Estado" asp-route-idMateria="@filtro.IdMateria" class="btn btn-ghost">Exportar Excel</a>
-            <a asp-action="ExportarPdf" asp-route-estado="@filtro.Estado" asp-route-idMateria="@filtro.IdMateria" class="btn btn-ghost">Exportar PDF</a>
+            @if (User.IsInRole("ADMINISTRADOR"))
+            {
+                <a asp-action="ExportarExcel" asp-route-estado="@filtro.Estado" asp-route-idMateria="@filtro.IdMateria" class="btn btn-ghost">Exportar Excel</a>
+                <a asp-action="ExportarPdf" asp-route-estado="@filtro.Estado" asp-route-idMateria="@filtro.IdMateria" class="btn btn-ghost">Exportar PDF</a>
+            }
             <a asp-action="Create" class="btn btn-primary">+ Registrar expediente</a>
         </div>
     }
@@ -103,3 +106,4 @@
         </table>
     </div>
 </div>
+
