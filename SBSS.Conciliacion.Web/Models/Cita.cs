@@ -5,6 +5,8 @@ namespace SBSS.Conciliacion.Web.Models;
 public class Cita
 {
     public long IdCita { get; set; }
+    public int? IdPersona { get; set; }
+    public int? IdMateria { get; set; }
     public string NombreCliente { get; set; } = string.Empty;
     public string ApellidoPaterno { get; set; } = string.Empty;
     public string ApellidoMaterno { get; set; } = string.Empty;
@@ -23,10 +25,15 @@ public class Cita
 
 public class CrearCitaVm
 {
-    [Required, StringLength(100)] public string NombreCliente { get; set; } = string.Empty;
-    [Required, StringLength(100)] public string ApellidoPaterno { get; set; } = string.Empty;
-    [Required, StringLength(100)] public string ApellidoMaterno { get; set; } = string.Empty;
-    [Required, StringLength(15)] public string DniCliente { get; set; } = string.Empty;
+    [Range(1, int.MaxValue, ErrorMessage = "Selecciona una persona registrada.")]
+    public int IdPersona { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Selecciona una materia.")]
+    public int IdMateria { get; set; }
+
+    public string NombreCliente { get; set; } = string.Empty;
+    public string ApellidoPaterno { get; set; } = string.Empty;
+    public string ApellidoMaterno { get; set; } = string.Empty;
+    public string DniCliente { get; set; } = string.Empty;
     [Phone, StringLength(20)] public string? Telefono { get; set; }
     [EmailAddress, StringLength(100)] public string? Correo { get; set; }
     [Required, StringLength(1000)] public string Motivo { get; set; } = string.Empty;
