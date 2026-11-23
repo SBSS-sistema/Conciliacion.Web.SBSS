@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Agendar cita";
     var conciliadores = ViewBag.Conciliadores as List<Trabajador> ?? new();
+    var sedes = ViewBag.Sedes as List<Sede> ?? new();
     var personas = ViewBag.Personas as List<PersonaListItem> ?? new();
     var materias = ViewBag.Materias as List<Materia> ?? new();
 }
@@ -49,15 +50,29 @@
     <textarea asp-for="Motivo" class="form-control" rows="3"></textarea>
     <span asp-validation-for="Motivo" class="text-danger"></span>
 
+    <label asp-for="IdSede">Sede de atención</label>
+    <select asp-for="IdSede" class="form-control" id="IdSede">
+        <option value="">-- Selecciona sede --</option>
+        @foreach (var sede in sedes)
+        {
+            <option value="@sede.IdSede">@sede.Nombre</option>
+        }
+    </select>
+    <span asp-validation-for="IdSede" class="text-danger"></span>
+
     <label asp-for="IdConciliador">Conciliador asignado</label>
-    <select asp-for="IdConciliador" class="form-control">
+    <select asp-for="IdConciliador" class="form-control" id="IdConciliador">
         <option value="">-- Selecciona conciliador --</option>
         @foreach (var t in conciliadores)
         {
-            <option value="@t.IdTrabajador">@t.NombreCompleto</option>
+            <option value="@t.IdTrabajador" data-sede="@t.IdSedeRef">@t.NombreCompleto</option>
         }
     </select>
     <span asp-validation-for="IdConciliador" class="text-danger"></span>
+    @if (sedes.Count == 0)
+    {
+        <p class="text-danger">No hay sedes activas disponibles.</p>
+    }
 
     <label asp-for="FechaHora">Fecha y hora</label>
     <input asp-for="FechaHora" type="datetime-local" class="form-control" value="@Model.FechaHora.ToString("yyyy-MM-ddTHH:mm")" />
@@ -67,7 +82,7 @@
     <textarea asp-for="Observaciones" class="form-control" rows="2"></textarea>
 
     <div style="display:flex;gap:12px;">
-        <button type="submit" class="btn btn-primary" disabled="@(personas.Count == 0 || materias.Count == 0)">Guardar cita</button>
+        <button type="submit" class="btn btn-primary" disabled="@(personas.Count == 0 || materias.Count == 0 || sedes.Count == 0)">Guardar cita</button>
         <a asp-action="Index" class="btn btn-ghost">Cancelar</a>
     </div>
 </form></div></div>
@@ -77,6 +92,21 @@
         (() => {
             const select = document.getElementById("IdPersona");
             const panel = document.getElementById("personaSeleccionada");
+            const sedeSelect = document.getElementById("IdSede");
+            const conciliadorSelect = document.getElementById("IdConciliador");
+            const filtrarConciliadores = () => {
+                const idSede = sedeSelect.value;
+                for (const option of conciliadorSelect.options) {
+                    if (!option.value) continue;
+                    const coincide = idSede && option.dataset.sede === idSede;
+                    option.hidden = !coincide;
+                    option.disabled = !coincide;
+                }
+                const actual = conciliadorSelect.options[conciliadorSelect.selectedIndex];
+                if (actual && actual.value && (actual.hidden || actual.disabled)) conciliadorSelect.value = "";
+            };
+            sedeSelect.addEventListener("change", filtrarConciliadores);
+            filtrarConciliadores();
             const update = () => {
                 const option = select.options[select.selectedIndex];
                 const selected = option && option.value;
