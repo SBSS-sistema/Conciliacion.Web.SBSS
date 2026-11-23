@@ -75,7 +75,7 @@ public class TrabajadorRepository : ITrabajadorRepository
             JOIN public.sede s ON s.idsede = t.idsedeRef
             WHERE t.idsedeRef = @idSede
               AND upper(coalesce(t.estadotrabajador, '')) = 'ACTIVO'
-              AND upper(coalesce(s.estadosede, '')) = 'ACTIVO'
+              AND upper(coalesce(s.estadosede, '')) IN ('ACTIVA', 'ACTIVO')
               AND upper(trim(coalesce(u.rol, ''))) = 'CONCILIADOR'
             ORDER BY t.nombretrabajador, t.apepatertrabajador, t.apematertrabajador;
             """, new { idSede });
