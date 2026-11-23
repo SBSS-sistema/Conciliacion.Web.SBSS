@@ -18,17 +18,17 @@ public class CitaRepository : ICitaRepository
         using var conn = _factory.CreateConnection();
         const string sql = """
             INSERT INTO public.cita
-                (nombre_cliente, apellido_paterno, apellido_materno, dni_cliente, telefono, correo,
-                 motivo, id_conciliador, id_usuario_creador, fecha_hora, observaciones)
+                (id_persona, id_materia, nombre_cliente, apellido_paterno, apellido_materno, dni_cliente,
+                 telefono, correo, motivo, id_conciliador, id_usuario_creador, fecha_hora, observaciones)
             VALUES
-                (@NombreCliente, @ApellidoPaterno, @ApellidoMaterno, @DniCliente, @Telefono, @Correo,
-                 @Motivo, @IdConciliador, @IdUsuarioCreador, @FechaHora, @Observaciones)
+                (@IdPersona, @IdMateria, @NombreCliente, @ApellidoPaterno, @ApellidoMaterno, @DniCliente,
+                 @Telefono, @Correo, @Motivo, @IdConciliador, @IdUsuarioCreador, @FechaHora, @Observaciones)
             RETURNING idcita;
             """;
         return await conn.ExecuteScalarAsync<long>(sql, new
         {
-            vm.NombreCliente, vm.ApellidoPaterno, vm.ApellidoMaterno, vm.DniCliente,
-            vm.Telefono, vm.Correo, vm.Motivo, vm.IdConciliador,
+            vm.IdPersona, vm.IdMateria, vm.NombreCliente, vm.ApellidoPaterno, vm.ApellidoMaterno,
+            vm.DniCliente, vm.Telefono, vm.Correo, vm.Motivo, vm.IdConciliador,
             IdUsuarioCreador = idUsuarioCreador,
             FechaHora = DateTime.SpecifyKind(vm.FechaHora, DateTimeKind.Unspecified),
             vm.Observaciones
@@ -96,7 +96,8 @@ public class CitaRepository : ICitaRepository
     {
         using var conn = _factory.CreateConnection();
         const string sql = """
-            SELECT c.idcita AS IdCita, c.nombre_cliente AS NombreCliente,
+            SELECT c.idcita AS IdCita, c.id_persona AS IdPersona, c.id_materia AS IdMateria,
+                   c.nombre_cliente AS NombreCliente,
                    c.apellido_paterno AS ApellidoPaterno, c.apellido_materno AS ApellidoMaterno,
                    c.dni_cliente AS DniCliente, c.telefono AS Telefono, c.correo AS Correo,
                    c.motivo AS Motivo, c.id_conciliador AS IdConciliador,
@@ -157,7 +158,8 @@ public class CitaRepository : ICitaRepository
         try
         {
             const string citaSql = """
-                SELECT idcita AS IdCita, nombre_cliente AS NombreCliente,
+                SELECT idcita AS IdCita, id_persona AS IdPersona, id_materia AS IdMateria,
+                       nombre_cliente AS NombreCliente,
                        apellido_paterno AS ApellidoPaterno, apellido_materno AS ApellidoMaterno,
                        dni_cliente AS DniCliente, telefono AS Telefono, correo AS Correo,
                        motivo AS Motivo, id_conciliador AS IdConciliador, estado AS Estado,
@@ -176,9 +178,13 @@ public class CitaRepository : ICitaRepository
             if (!idSede.HasValue)
                 throw new InvalidOperationException("El conciliador no tiene una sede activa asignada.");
 
-            var idPersona = await pg.QueryFirstOrDefaultAsync<int?>("""
-                SELECT idpersonanatural FROM public."natural" WHERE dnipersonan = @Dni;
-                """, new { Dni = cita.DniCliente }, tx);
+            int? idPersona = cita.IdPersona;
+            if (!idPersona.HasValue)
+            {
+                idPersona = await pg.QueryFirstOrDefaultAsync<int?>("""
+                    SELECT idpersonanatural FROM public."natural" WHERE dnipersonan = @Dni;
+                    """, new { Dni = cita.DniCliente }, tx);
+            }
             if (!idPersona.HasValue)
             {
                 idPersona = await pg.QuerySingleAsync<int>("""
@@ -216,6 +222,15 @@ public class CitaRepository : ICitaRepository
                     p_idexpediente => @idExpediente, p_idpersona => @idPersona,
                     p_rolparticipante => 'SOLICITANTE')
                 """, new { idExpediente, idPersona }, tx);
+
+            if (cita.IdMateria.HasValue)
+            {
+                await pg.ExecuteAsync("""
+                    SELECT * FROM sp_detallemateriaexpediente_agregar(
+                        p_idexpediente => @idExpediente, p_idmateria => @idMateria,
+                        p_descripciondtmateria => @descripcion)
+                    """, new { idExpediente, idMateria = cita.IdMateria, descripcion = cita.Motivo }, tx);
+            }
 
             var updated = await pg.ExecuteAsync("""
                 UPDATE public.cita SET estado = 'CONVERTIDA', id_expediente = @IdExpediente,
