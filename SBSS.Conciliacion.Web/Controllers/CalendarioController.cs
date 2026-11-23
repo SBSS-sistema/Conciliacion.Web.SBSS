@@ -6,12 +6,17 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
 public class CalendarioController : Controller
 {
     private readonly IAudienciaRepository _audiencias;
+    private readonly ICitaRepository _citas;
 
-    public CalendarioController(IAudienciaRepository audiencias) => _audiencias = audiencias;
+    public CalendarioController(IAudienciaRepository audiencias, ICitaRepository citas)
+    {
+        _audiencias = audiencias;
+        _citas = citas;
+    }
 
     // GET: /Calendario
     public IActionResult Index() => View();
@@ -25,7 +30,7 @@ public class CalendarioController : Controller
             return BadRequest();
 
         int? idConciliador = null;
-        if (soloMias)
+        if (User.IsInRole("CONCILIADOR") || soloMias)
         {
             var idTrabajador = int.Parse(User.FindFirstValue("idTrabajador") ?? "0");
             idConciliador = idTrabajador;
@@ -70,6 +75,22 @@ public class CalendarioController : Controller
                     extendedProps = new { tipo = "vencimiento", estado = v.EstadoProceso, resultado = (string?)null, conciliador = (string?)null }
                 });
             }
+        }
+
+        foreach (var cita in await _citas.ListarPorRangoAsync(desde, hasta, idConciliador))
+        {
+            var inicio = DateTime.SpecifyKind(cita.FechaHora, DateTimeKind.Unspecified);
+            eventos.Add(new
+            {
+                id = $"cita-{cita.IdCita}",
+                title = $"Cita · {cita.NombreCliente} {cita.ApellidoPaterno}",
+                start = inicio.ToString("yyyy-MM-dd'T'HH:mm:ss"),
+                end = inicio.AddMinutes(45).ToString("yyyy-MM-dd'T'HH:mm:ss"),
+                allDay = false,
+                url = Url.Action("Details", "Citas", new { id = cita.IdCita }),
+                color = cita.Estado == "CANCELADA" ? "#5b6a70" : "#b3893a",
+                extendedProps = new { tipo = "cita", estado = cita.Estado, conciliador = cita.Conciliador }
+            });
         }
 
         return Json(eventos);

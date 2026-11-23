@@ -5,7 +5,7 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize]
+[Authorize(Roles = "ADMINISTRADOR")]
 public class TrabajadoresController : Controller
 {
     private readonly ITrabajadorRepository _trabajadores;
@@ -118,6 +118,8 @@ public class TrabajadoresController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CrearAcceso(CrearAccesoVm vm)
     {
+        if (vm.Rol is not ("ADMINISTRADOR" or "CONCILIADOR" or "MESA_DE_PARTES"))
+            ModelState.AddModelError(nameof(vm.Rol), "Selecciona un rol válido.");
         if (!ModelState.IsValid) return View(vm);
 
         var hash = BCrypt.Net.BCrypt.HashPassword(vm.Contrasenia);

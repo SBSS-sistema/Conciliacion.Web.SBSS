@@ -5,7 +5,7 @@ using SBSS.Conciliacion.Web.Repositories;
 namespace SBSS.Conciliacion.Web.Controllers;
 
 /// <summary>Endpoints ligeros (fetch desde las vistas) para los combos en cascada Departamento → Provincia → Distrito.</summary>
-[Authorize]
+[Authorize(Roles = "ADMINISTRADOR")]
 [Route("api/ubigeo")]
 public class UbigeoController : Controller
 {

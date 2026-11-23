@@ -9,7 +9,7 @@ namespace SBSS.Conciliacion.Web.Hubs;
 /// "usuario-{idUsuario}", así el servidor puede enviarle solo sus propias alertas
 /// (vencimientos, audiencias asignadas, cambios de estado, etc.).
 /// </summary>
-[Authorize]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
 public class NotificacionesHub : Hub
 {
     public override async Task OnConnectedAsync()

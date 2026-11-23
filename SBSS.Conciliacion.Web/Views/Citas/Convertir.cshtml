@@ -1,0 +1,11 @@
+@model ConvertirCitaVm
+@{ ViewData["Title"] = "Iniciar expediente"; }
+<div class="wrap page-head"><h1>Iniciar expediente desde cita</h1><p>La persona aceptó continuar con el proceso de conciliación.</p></div>
+<div class="wrap"><div class="panel" style="max-width:560px;"><form asp-action="Convertir" method="post" class="form-sbss">
+    <input type="hidden" asp-for="IdCita"/><div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+    <label asp-for="NumeroExpediente">Número de expediente</label><input asp-for="NumeroExpediente" class="form-control"/><span asp-validation-for="NumeroExpediente" class="text-danger"></span>
+    <label asp-for="PlazoDias">Plazo en días</label><input asp-for="PlazoDias" class="form-control"/><span asp-validation-for="PlazoDias" class="text-danger"></span>
+    <p>Se creará la ficha de la persona y quedará vinculada como solicitante. La cita pasará a estado CONVERTIDA.</p>
+    <div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">Crear expediente</button><a asp-action="Details" asp-route-id="@Model.IdCita" class="btn btn-ghost">Volver</a></div>
+</form></div></div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

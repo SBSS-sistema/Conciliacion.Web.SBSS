@@ -5,7 +5,7 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize]
+[Authorize(Roles = "ADMINISTRADOR")]
 public class PersonasController : Controller
 {
     private readonly IPersonaRepository _personas;

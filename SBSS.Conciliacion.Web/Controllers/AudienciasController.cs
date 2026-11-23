@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SBSS.Conciliacion.Web.Models;
@@ -6,7 +7,7 @@ using SBSS.Conciliacion.Web.Services;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
 public class AudienciasController : Controller
 {
     private readonly IAudienciaRepository _audiencias;
@@ -41,6 +42,7 @@ public class AudienciasController : Controller
     {
         var expediente = await _expedientes.ObtenerPorIdAsync(idExpediente);
         if (expediente is null) return NotFound();
+        if (!EsAdministrador() && expediente.Expediente.IdConciliador != IdTrabajadorActual()) return Forbid();
 
         await CargarCatalogosAsync();
 
@@ -56,6 +58,10 @@ public class AudienciasController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Programar(ProgramarAudienciaVm vm)
     {
+        var expediente = await _expedientes.ObtenerPorIdAsync(vm.IdExpediente);
+        if (expediente is null) return NotFound();
+        if (!EsAdministrador() && expediente.Expediente.IdConciliador != IdTrabajadorActual()) return Forbid();
+        if (!EsAdministrador()) vm.IdConciliador = IdTrabajadorActual();
         if (!ModelState.IsValid)
         {
             await CargarCatalogosAsync();
@@ -83,13 +89,15 @@ public class AudienciasController : Controller
     {
         var audiencia = await _audiencias.ObtenerPorIdAsync(id);
         if (audiencia is null) return NotFound();
+        if (!await PuedeAccederExpedienteAsync(audiencia.IdExpediente)) return Forbid();
         return View(audiencia);
     }
 
     // GET: /Audiencias/Reprogramar/12
     [HttpGet]
-    public IActionResult Reprogramar(int idDocumento, int idExpediente)
+    public async Task<IActionResult> Reprogramar(int idDocumento, int idExpediente)
     {
+        if (!await PuedeAccederExpedienteAsync(idExpediente)) return Forbid();
         return View(new ReprogramarAudienciaVm { IdDocumento = idDocumento, IdExpediente = idExpediente });
     }
 
@@ -98,6 +106,10 @@ public class AudienciasController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reprogramar(ReprogramarAudienciaVm vm)
     {
+        if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
+        var audiencia = await _audiencias.ObtenerPorIdAsync(vm.IdDocumento);
+        if (audiencia is null) return NotFound();
+        if (audiencia.IdExpediente != vm.IdExpediente) return Forbid();
         if (!ModelState.IsValid) return View(vm);
 
         await _audiencias.ReprogramarAsync(vm);
@@ -107,8 +119,9 @@ public class AudienciasController : Controller
 
     // GET: /Audiencias/RegistrarResultado
     [HttpGet]
-    public IActionResult RegistrarResultado(int idDocumento, int idExpediente)
+    public async Task<IActionResult> RegistrarResultado(int idDocumento, int idExpediente)
     {
+        if (!await PuedeAccederExpedienteAsync(idExpediente)) return Forbid();
         return View(new RegistrarResultadoVm { IdDocumento = idDocumento, IdExpediente = idExpediente });
     }
 
@@ -117,6 +130,10 @@ public class AudienciasController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RegistrarResultado(RegistrarResultadoVm vm)
     {
+        if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
+        var audiencia = await _audiencias.ObtenerPorIdAsync(vm.IdDocumento);
+        if (audiencia is null) return NotFound();
+        if (audiencia.IdExpediente != vm.IdExpediente) return Forbid();
         if (!ModelState.IsValid) return View(vm);
 
         await _audiencias.RegistrarResultadoAsync(vm);
@@ -127,6 +144,7 @@ public class AudienciasController : Controller
     // GET: /Audiencias/DescargarCitacion?idExpediente=5&idDocumento=12
     public async Task<IActionResult> DescargarCitacion(ProgramarAudienciaVm vm)
     {
+        if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
         var detalle = await _expedientes.ObtenerPorIdAsync(vm.IdExpediente);
         if (detalle is null) return NotFound();
 
@@ -137,7 +155,18 @@ public class AudienciasController : Controller
 
     private async Task CargarCatalogosAsync()
     {
-        ViewBag.Conciliadores = (await _trabajadores.ListarAsync(soloActivos: true)).ToList();
+        ViewBag.Conciliadores = EsAdministrador()
+            ? (await _trabajadores.ListarAsync(soloActivos: true)).ToList()
+            : (await _trabajadores.ObtenerPorIdAsync(IdTrabajadorActual()) is { } propio ? new List<Trabajador> { propio } : new List<Trabajador>());
         ViewBag.TiposDocumento = (await _documentos.ListarTiposDocumentoAsync()).ToList();
+    }
+
+    private bool EsAdministrador() => User.IsInRole("ADMINISTRADOR");
+    private int IdTrabajadorActual() => int.Parse(User.FindFirstValue("idTrabajador") ?? "0");
+    private async Task<bool> PuedeAccederExpedienteAsync(int idExpediente)
+    {
+        if (EsAdministrador()) return true;
+        var detalle = await _expedientes.ObtenerPorIdAsync(idExpediente);
+        return User.IsInRole("CONCILIADOR") && detalle?.Expediente.IdConciliador == IdTrabajadorActual();
     }
 }

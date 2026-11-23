@@ -1,0 +1,23 @@
+@model Cita
+@{
+    ViewData["Title"] = "Detalle de cita";
+    var puedeGestionarAgenda = User.IsInRole("ADMINISTRADOR") || User.IsInRole("MESA_DE_PARTES");
+    var puedeAtender = User.IsInRole("ADMINISTRADOR") || User.IsInRole("CONCILIADOR");
+}
+<div class="wrap page-head"><span class="eyebrow">Cita</span><h1>@Model.NombreCliente @Model.ApellidoPaterno @Model.ApellidoMaterno</h1><p><strong>@Model.Estado</strong> · @Model.FechaHora.ToString("dd/MM/yyyy HH:mm")</p></div>
+<div class="wrap" style="display:grid;grid-template-columns:2fr 1fr;gap:22px;">
+<div class="panel"><h3>Datos de la atención</h3><p><strong>DNI:</strong> @Model.DniCliente</p><p><strong>Teléfono:</strong> @(Model.Telefono ?? "—")</p><p><strong>Correo:</strong> @(Model.Correo ?? "—")</p><p><strong>Conciliador:</strong> @Model.Conciliador</p><p><strong>Motivo:</strong><br/>@Model.Motivo</p><p><strong>Observaciones:</strong><br/>@(Model.Observaciones ?? "—")</p>
+@if (Model.IdExpediente.HasValue) { <p><a asp-controller="Expedientes" asp-action="Details" asp-route-id="@Model.IdExpediente" class="btn btn-primary">Abrir expediente @Model.IdExpediente</a></p> }
+</div>
+<div>
+@if (puedeGestionarAgenda && Model.Estado is ("PROGRAMADA" or "REPROGRAMADA"))
+{
+<div class="panel"><h3>Reprogramar</h3><form asp-action="Reprogramar" method="post" class="form-sbss"><input type="hidden" name="id" value="@Model.IdCita"/><label>Nueva fecha y hora</label><input name="fechaHora" type="datetime-local" class="form-control" required/><label>Nota</label><textarea name="observaciones" class="form-control" rows="2">@Model.Observaciones</textarea><button class="btn btn-primary" type="submit">Guardar cambio</button></form><form asp-action="Cancelar" method="post" style="margin-top:12px;"><input type="hidden" name="id" value="@Model.IdCita"/><input type="hidden" name="observaciones" value="Cancelada por mesa de partes."/><button class="btn btn-danger" type="submit">Cancelar cita</button></form></div>
+}
+@if (puedeAtender && Model.Estado is ("PROGRAMADA" or "REPROGRAMADA") && (User.IsInRole("ADMINISTRADOR") || Model.IdConciliador == int.Parse(User.FindFirst("idTrabajador")?.Value ?? "0")))
+{
+<div class="panel"><h3>Resultado de la cita</h3><form asp-action="RegistrarAtencion" method="post" class="form-sbss"><input type="hidden" name="id" value="@Model.IdCita"/><label>Resultado</label><select name="estado" class="form-control"><option value="ATENDIDA">Atendida</option><option value="NO_ASISTIO">No asistió</option></select><label>Nota de atención</label><textarea name="observaciones" class="form-control" rows="3"></textarea><button class="btn btn-primary" type="submit">Guardar atención</button></form></div>
+}
+@if (puedeAtender && Model.Estado == "ATENDIDA" && !Model.IdExpediente.HasValue && (User.IsInRole("ADMINISTRADOR") || Model.IdConciliador == int.Parse(User.FindFirst("idTrabajador")?.Value ?? "0")))
+{ <div class="panel"><h3>La persona desea continuar</h3><p>Inicia el expediente con los datos registrados en esta cita.</p><a asp-action="Convertir" asp-route-id="@Model.IdCita" class="btn btn-primary">Crear expediente</a></div> }
+</div></div>

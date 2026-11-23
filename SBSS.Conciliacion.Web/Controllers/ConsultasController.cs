@@ -12,7 +12,7 @@ namespace SBSS.Conciliacion.Web.Controllers;
 /// IDecolectaService. Validan el formato del documento ANTES de llamar a la
 /// API externa, para no gastar cuota con números que ya sabemos inválidos.
 /// </summary>
-[Authorize]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
 [Route("api/consultas")]
 public class ConsultasController : Controller
 {

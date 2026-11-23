@@ -1,3 +1,4 @@
+using Dapper;
 using SBSS.Conciliacion.Web.Data;
 using SBSS.Conciliacion.Web.Models;
 
@@ -13,7 +14,62 @@ public class UsuarioRepository : IUsuarioRepository
     {
         using var conn = _factory.CreateConnection();
         // Solo trae el hash: la comparación se hace en la app (BCrypt).
-        return await conn.QueryFirstOrDefaultProcAsync<UsuarioLogin>("sp_Usuario_ObtenerParaLogin", new { usuario });
+        var porUsuario = await conn.QueryFirstOrDefaultProcAsync<UsuarioLogin>("sp_Usuario_ObtenerParaLogin", new { usuario });
+        if (porUsuario is not null) return porUsuario;
+
+        return await conn.QueryFirstOrDefaultAsync<UsuarioLogin>("""
+            SELECT u.idusuario AS IdUsuario, u.usuario AS Usuario, u.contrasenia AS Contrasenia,
+                   u.rol AS Rol, u.idtrabajador AS IdTrabajador,
+                   t.nombretrabajador AS NombreTrabajador,
+                   t.apepatertrabajador AS ApePaterTrabajador,
+                   t.estadotrabajador AS EstadoTrabajador
+            FROM public.usuario u
+            JOIN public.trabajador t ON t.idtrabajador = u.idtrabajador
+            WHERE lower(t.emailtrabajador) = lower(@usuario)
+            LIMIT 1;
+            """, new { usuario });
+    }
+
+    public async Task<string?> ObtenerRolActivoAsync(int idUsuario)
+    {
+        using var conn = _factory.CreateConnection();
+        return await conn.QueryFirstOrDefaultAsync<string>("""
+            SELECT upper(u.rol) FROM public.usuario u
+            JOIN public.trabajador t ON t.idtrabajador = u.idtrabajador
+            WHERE u.idusuario = @idUsuario AND upper(coalesce(t.estadotrabajador, '')) = 'ACTIVO';
+            """, new { idUsuario });
+    }
+
+    public async Task<IEnumerable<UsuarioAdminVm>> ListarParaAdministracionAsync()
+    {
+        using var conn = _factory.CreateConnection();
+        return await conn.QueryAsync<UsuarioAdminVm>("""
+            SELECT u.idusuario AS IdUsuario, u.idtrabajador AS IdTrabajador,
+                   u.usuario AS Usuario, u.rol AS Rol, t.emailtrabajador AS Correo,
+                   concat_ws(' ', t.nombretrabajador, t.apepatertrabajador, t.apematertrabajador) AS NombreTrabajador
+            FROM public.usuario u JOIN public.trabajador t ON t.idtrabajador = u.idtrabajador
+            ORDER BY t.nombretrabajador, u.usuario;
+            """);
+    }
+
+    public async Task<bool> CambiarRolAsync(int idUsuario, string rol)
+    {
+        using var conn = _factory.CreateConnection();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+        // Serialize role changes so two simultaneous updates cannot remove the last two administrators.
+        await conn.ExecuteAsync("SELECT pg_advisory_xact_lock(715203011);", transaction: tx);
+        const string sql = """
+            UPDATE public.usuario u SET rol = @rol
+            WHERE u.idusuario = @idUsuario
+              AND @rol IN ('ADMINISTRADOR', 'CONCILIADOR', 'MESA_DE_PARTES')
+              AND (upper(coalesce(u.rol, '')) <> 'ADMINISTRADOR'
+                   OR @rol = 'ADMINISTRADOR'
+                   OR (SELECT count(*) FROM public.usuario WHERE upper(coalesce(rol, '')) = 'ADMINISTRADOR') > 1);
+            """;
+        var updated = await conn.ExecuteAsync(sql, new { idUsuario, rol }, tx) == 1;
+        tx.Commit();
+        return updated;
     }
 
     public async Task<int?> ObtenerIdUsuarioPorTrabajadorAsync(int idTrabajador)

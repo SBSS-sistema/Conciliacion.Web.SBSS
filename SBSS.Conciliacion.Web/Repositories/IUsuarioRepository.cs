@@ -5,6 +5,9 @@ namespace SBSS.Conciliacion.Web.Repositories;
 public interface IUsuarioRepository
 {
     Task<UsuarioLogin?> ObtenerParaLoginAsync(string usuario);
+    Task<string?> ObtenerRolActivoAsync(int idUsuario);
+    Task<IEnumerable<UsuarioAdminVm>> ListarParaAdministracionAsync();
+    Task<bool> CambiarRolAsync(int idUsuario, string rol);
 
     /// <summary>Resuelve el idUsuario (credenciales) de un trabajador, o null si aún no tiene acceso al sistema.</summary>
     Task<int?> ObtenerIdUsuarioPorTrabajadorAsync(int idTrabajador);

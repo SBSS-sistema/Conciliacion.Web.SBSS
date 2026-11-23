@@ -5,7 +5,7 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
 public class NotificacionesController : Controller
 {
     private readonly INotificacionRepository _notificaciones;
@@ -27,6 +27,8 @@ public class NotificacionesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> MarcarLeida(int id)
     {
+        var propias = await _notificaciones.ListarPorUsuarioAsync(ObtenerIdUsuario(), soloNoLeidas: false);
+        if (!propias.Any(n => n.IdNotificacion == id)) return NotFound();
         await _notificaciones.MarcarLeidaAsync(id);
         return RedirectToAction(nameof(Index));
     }
@@ -53,6 +55,8 @@ public class NotificacionesController : Controller
     [HttpPost("api/notificaciones/{id:int}/marcar-leida")]
     public async Task<IActionResult> MarcarLeidaApi(int id)
     {
+        var propias = await _notificaciones.ListarPorUsuarioAsync(ObtenerIdUsuario(), soloNoLeidas: false);
+        if (!propias.Any(n => n.IdNotificacion == id)) return NotFound();
         await _notificaciones.MarcarLeidaAsync(id);
         return Ok();
     }

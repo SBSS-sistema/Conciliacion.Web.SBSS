@@ -1,0 +1,21 @@
+@model IEnumerable<CitaListItemVm>
+@{
+    ViewData["Title"] = "Citas";
+}
+<div class="wrap page-head" style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+    <div><h1>Citas</h1><p>Primera atención y evaluación inicial de conciliación.</p></div>
+    @if (User.IsInRole("ADMINISTRADOR") || User.IsInRole("MESA_DE_PARTES"))
+    {
+        <a asp-action="Create" class="btn btn-primary">+ Agendar cita</a>
+    }
+</div>
+<div class="wrap"><div class="panel" style="padding:0;overflow-x:auto;">
+    <table class="tabla-sbss"><thead><tr><th>Fecha y hora</th><th>Persona</th><th>DNI</th><th>Conciliador</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+    @if (!Model.Any()) { <tr><td colspan="6" style="text-align:center;padding:24px;">No hay citas registradas.</td></tr> }
+    @foreach (var c in Model)
+    {
+        <tr><td>@c.FechaHora.ToString("dd/MM/yyyy HH:mm")</td><td>@c.NombreCliente @c.ApellidoPaterno @c.ApellidoMaterno</td><td>@c.DniCliente</td><td>@c.Conciliador</td><td>@c.Estado</td><td><a asp-action="Details" asp-route-id="@c.IdCita" class="btn btn-ghost">Ver</a></td></tr>
+    }
+    </tbody></table>
+</div></div>

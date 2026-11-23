@@ -1,0 +1,21 @@
+@model IEnumerable<UsuarioAdminVm>
+@{
+    ViewData["Title"] = "Usuarios y roles";
+}
+<div class="wrap page-head"><h1>Usuarios y roles</h1><p>Administra los permisos de acceso y genera enlaces de restablecimiento de contraseña.</p></div>
+<div class="wrap">
+    @if (ViewBag.EnlaceGenerado is string enlace)
+    {
+        <div class="panel" style="border:2px solid #1f6b3a;"><h3>Enlace temporal para @ViewBag.UsuarioEnlace</h3><p>Vence en @ViewBag.ExpiraEnMinutos minutos. Compártelo directamente con la persona.</p><p style="word-break:break-all;"><a href="@enlace">@enlace</a></p></div>
+    }
+    <div class="panel" style="padding:0;overflow-x:auto;"><table class="tabla-sbss">
+        <thead><tr><th>Trabajador</th><th>Usuario</th><th>Correo</th><th>Rol</th><th>Actualizar rol</th><th>Contraseña</th></tr></thead>
+        <tbody>@foreach (var u in Model)
+        {
+            <tr><td>@u.NombreTrabajador</td><td>@u.Usuario</td><td>@(u.Correo ?? "—")</td><td>@u.Rol</td>
+                <td><form asp-action="CambiarRol" method="post" style="display:flex;gap:8px;align-items:center;"><input type="hidden" name="IdUsuario" value="@u.IdUsuario"/><select name="Rol" class="form-control" style="margin:0;min-width:170px;"><option value="ADMINISTRADOR" selected="@(u.Rol == "ADMINISTRADOR")">Administrador</option><option value="CONCILIADOR" selected="@(u.Rol == "CONCILIADOR")">Conciliador</option><option value="MESA_DE_PARTES" selected="@(u.Rol == "MESA_DE_PARTES")">Mesa de partes</option></select><button class="btn btn-ghost" type="submit">Guardar</button></form></td>
+                <td><form asp-action="GenerarRestablecimiento" method="post"><input type="hidden" name="idUsuario" value="@u.IdUsuario"/><button class="btn btn-ghost" type="submit">Generar enlace</button></form></td>
+            </tr>
+        }</tbody>
+    </table></div>
+</div>

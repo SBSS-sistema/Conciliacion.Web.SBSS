@@ -20,10 +20,13 @@
     </div>
     <div style="display:flex;gap:12px;">
         <a asp-controller="Audiencias" asp-action="Programar" asp-route-idExpediente="@e.IdExpediente" class="btn btn-primary">+ Programar audiencia</a>
-        <form asp-action="Delete" method="post" onsubmit="return confirm('¿Seguro que quieres eliminar el expediente @e.NumeroExpediente? Esta acción no se puede deshacer y borra también sus audiencias, documentos y archivos.');">
-            <input type="hidden" name="id" value="@e.IdExpediente" />
-            <button type="submit" class="btn btn-danger">Eliminar expediente</button>
-        </form>
+        @if (User.IsInRole("ADMINISTRADOR"))
+        {
+            <form asp-action="Delete" method="post" onsubmit="return confirm('¿Seguro que quieres eliminar el expediente @e.NumeroExpediente? Esta acción no se puede deshacer y borra también sus audiencias, documentos y archivos.');">
+                <input type="hidden" name="id" value="@e.IdExpediente" />
+                <button type="submit" class="btn btn-danger">Eliminar expediente</button>
+            </form>
+        }
     </div>
 </div>
 
@@ -159,12 +162,15 @@
             {
                 <p style="color:#4a5a61;margin-bottom:14px;">Aún no tiene conciliador asignado.</p>
             }
-            <form asp-action="AsignarConciliador" method="post" onsubmit="return confirm('El sistema asignará un conciliador al azar entre los trabajadores activos. ¿Continuar?');">
-                <input type="hidden" name="idExpediente" value="@e.IdExpediente" />
-                <button type="submit" class="btn btn-primary" style="width:100%;">
-                    @(string.IsNullOrEmpty(e.NombreConciliador) ? "Asignar conciliador (aleatorio)" : "Reasignar conciliador (aleatorio)")
-                </button>
-            </form>
+            @if (User.IsInRole("ADMINISTRADOR"))
+            {
+                <form asp-action="AsignarConciliador" method="post" onsubmit="return confirm('El sistema asignará un conciliador al azar entre los trabajadores activos. ¿Continuar?');">
+                    <input type="hidden" name="idExpediente" value="@e.IdExpediente" />
+                    <button type="submit" class="btn btn-primary" style="width:100%;">
+                        @(string.IsNullOrEmpty(e.NombreConciliador) ? "Asignar conciliador (aleatorio)" : "Reasignar conciliador (aleatorio)")
+                    </button>
+                </form>
+            }
         </div>
 
         <div class="panel">
@@ -197,6 +203,8 @@
                 </div>
             }
 
+            @if (User.IsInRole("ADMINISTRADOR"))
+            {
             <form asp-action="AgregarPersona" method="post" class="form-sbss" style="margin-top:16px;border-top:1px solid rgba(12,56,85,0.08);padding-top:16px;">
                 <input type="hidden" name="IdExpediente" value="@e.IdExpediente" />
                 <label>Vincular persona</label>
@@ -217,6 +225,7 @@
                 <button type="submit" class="btn btn-ghost" style="width:100%;">Vincular persona</button>
             </form>
             <a asp-controller="Personas" asp-action="CreateNatural" style="display:block;text-align:center;margin-top:10px;font-size:0.85rem;color:var(--navy);text-decoration:underline;">¿La persona no existe? Regístrala aquí</a>
+            }
         </div>
     </div>
 </div>

@@ -8,7 +8,7 @@ using SBSS.Conciliacion.Web.Services;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
 public class ExpedientesController : Controller
 {
     private readonly IExpedienteRepository _expedientes;
@@ -55,6 +55,8 @@ public class ExpedientesController : Controller
  
     public async Task<IActionResult> Index(ExpedienteFiltroVm filtro)
     {
+        if (User.IsInRole("CONCILIADOR"))
+            filtro.IdConciliador = IdTrabajadorActual();
         var lista = await _expedientes.ListarAsync(filtro);
         ViewBag.Filtro = filtro;
 
@@ -103,16 +105,18 @@ public class ExpedientesController : Controller
     {
         var detalle = await _expedientes.ObtenerPorIdAsync(id);
         if (detalle is null) return NotFound();
+        if (User.IsInRole("CONCILIADOR") && detalle.Expediente.IdConciliador != IdTrabajadorActual()) return Forbid();
 
         detalle.Audiencias = (await _audiencias.ListarPorExpedienteAsync(id)).ToList();
         detalle.Archivos = (await _documentos.ListarArchivosPorExpedienteAsync(id)).ToList();
 
-        ViewBag.Personas = (await _personas.ListarAsync()).ToList();
+        ViewBag.Personas = User.IsInRole("ADMINISTRADOR") ? (await _personas.ListarAsync()).ToList() : new List<PersonaListItem>();
         ViewBag.Materias = (await _materias.ListarMateriasAsync()).ToList();
         return View(detalle);
     }
 
     [HttpGet]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> Create()
     {
         await CargarCatalogosAsync();
@@ -121,6 +125,7 @@ public class ExpedientesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> Create(CrearExpedienteVm vm)
     {
         if (!ModelState.IsValid)
@@ -137,6 +142,7 @@ public class ExpedientesController : Controller
     
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> AsignarConciliador(int idExpediente)
     {
         int idConciliadorAsignado;
@@ -170,6 +176,9 @@ public class ExpedientesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CambiarEstado(CambiarEstadoVm vm)
     {
+        if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
+        if (vm.NuevoEstado is not ("REGISTRADO" or "ASIGNADO" or "EN_PROCESO" or "CONCLUIDO" or "ARCHIVADO"))
+            return BadRequest();
         await _expedientes.CambiarEstadoAsync(vm.IdExpediente, vm.NuevoEstado);
         TempData["Ok"] = $"El expediente cambió de estado a {vm.NuevoEstado}.";
         return RedirectToAction(nameof(Details), new { id = vm.IdExpediente });
@@ -177,6 +186,7 @@ public class ExpedientesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> AgregarPersona(AgregarPersonaExpedienteVm vm)
     {
         if (!ModelState.IsValid || vm.IdPersona <= 0)
@@ -194,6 +204,7 @@ public class ExpedientesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AgregarMateria(AgregarMateriaExpedienteVm vm)
     {
+        if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
         if (!ModelState.IsValid || vm.IdMateria <= 0)
         {
             TempData["Error"] = "Selecciona una materia antes de vincular. Si el combo está vacío, primero registra materias en Catálogos → Materias.";
@@ -207,6 +218,7 @@ public class ExpedientesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR")]
     public async Task<IActionResult> Delete(int id)
     {
         await _expedientes.EliminarAsync(id);
@@ -219,6 +231,7 @@ public class ExpedientesController : Controller
     [RequestSizeLimit(200L * 1024 * 1024)]
     public async Task<IActionResult> SubirArchivo(SubirArchivoVm vm)
     {
+        if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Selecciona un archivo y un tipo válidos.";
@@ -244,6 +257,7 @@ public class ExpedientesController : Controller
     {
         var archivo = await _documentos.ObtenerArchivoPorIdAsync(id);
         if (archivo is null) return NotFound();
+        if (!await PuedeAccederExpedienteAsync(archivo.IdExpediente)) return Forbid();
 
         var bytes = await _almacenamiento.LeerAsync(archivo.RutaArchivo);
         if (bytes is null) return NotFound();
@@ -257,6 +271,7 @@ public class ExpedientesController : Controller
 
     public async Task<IActionResult> ExportarExcel(ExpedienteFiltroVm filtro)
     {
+        if (!User.IsInRole("ADMINISTRADOR")) return Forbid();
         var lista = await _expedientes.ListarAsync(filtro);
         var archivo = _excel.GenerarReporteExpedientes(lista);
         var nombre = $"Expedientes_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
@@ -265,6 +280,7 @@ public class ExpedientesController : Controller
 
     public async Task<IActionResult> ExportarPdf(ExpedienteFiltroVm filtro)
     {
+        if (!User.IsInRole("ADMINISTRADOR")) return Forbid();
         var lista = await _expedientes.ListarAsync(filtro);
         var archivo = _pdf.GenerarReporteExpedientes(lista);
         var nombre = $"Expedientes_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
@@ -275,5 +291,14 @@ public class ExpedientesController : Controller
     {
         ViewBag.Sedes = (await _sedes.ListarAsync(soloActivas: true)).ToList();
         ViewBag.Trabajadores = (await _trabajadores.ListarAsync(soloActivos: true)).ToList();
+    }
+
+    private int IdTrabajadorActual() => int.Parse(User.FindFirstValue("idTrabajador") ?? "0");
+
+    private async Task<bool> PuedeAccederExpedienteAsync(int idExpediente)
+    {
+        if (User.IsInRole("ADMINISTRADOR")) return true;
+        var detalle = await _expedientes.ObtenerPorIdAsync(idExpediente);
+        return User.IsInRole("CONCILIADOR") && detalle?.Expediente.IdConciliador == IdTrabajadorActual();
     }
 }
