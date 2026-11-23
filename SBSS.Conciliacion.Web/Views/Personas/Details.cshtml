@@ -49,12 +49,16 @@
         </div>
     </div>
 
-    <div class="panel">
-        <h3 style="margin-bottom:16px;">Estado</h3>
-        <form asp-action="CambiarEstado" method="post">
-            <input type="hidden" name="IdPersona" value="@Model.IdPersona" />
-            <input type="hidden" name="EstadoPersona" value="@(Model.EstadoPersona == "ACTIVO" ? "INACTIVO" : "ACTIVO")" />
-            <button type="submit" class="btn btn-ghost" style="width:100%;">@(Model.EstadoPersona == "ACTIVO" ? "Desactivar" : "Activar")</button>
-        </form>
-    </div>
+    @if (User.IsInRole("ADMINISTRADOR"))
+    {
+        <div class="panel">
+            <h3 style="margin-bottom:16px;">Estado</h3>
+            <form asp-action="CambiarEstado" method="post">
+                <input type="hidden" name="IdPersona" value="@Model.IdPersona" />
+                <input type="hidden" name="EstadoPersona" value="@(Model.EstadoPersona == "ACTIVO" ? "INACTIVO" : "ACTIVO")" />
+                <button type="submit" class="btn btn-ghost" style="width:100%;">@(Model.EstadoPersona == "ACTIVO" ? "Desactivar" : "Activar")</button>
+            </form>
+        </div>
+    }
 </div>
+
