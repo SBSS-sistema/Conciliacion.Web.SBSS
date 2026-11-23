@@ -6,7 +6,7 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR,MESA_DE_PARTES")]
 public class CalendarioController : Controller
 {
     private readonly IAudienciaRepository _audiencias;
@@ -29,8 +29,9 @@ public class CalendarioController : Controller
         if (!TryFecha(start, out var desde) || !TryFecha(end, out var hasta))
             return BadRequest();
 
+        var esMesaDePartes = User.IsInRole("MESA_DE_PARTES");
         int? idConciliador = null;
-        if (User.IsInRole("CONCILIADOR") || soloMias)
+        if (User.IsInRole("CONCILIADOR") || (User.IsInRole("ADMINISTRADOR") && soloMias))
         {
             var idTrabajador = int.Parse(User.FindFirstValue("idTrabajador") ?? "0");
             idConciliador = idTrabajador;
@@ -38,42 +39,45 @@ public class CalendarioController : Controller
 
         var eventos = new List<object>();
 
-        foreach (var a in await _audiencias.ListarPorRangoAsync(desde, hasta, idConciliador))
+        if (!esMesaDePartes)
         {
-            var inicio = a.Fecha.Date + (a.Hora ?? TimeSpan.Zero);
-            eventos.Add(new
+            foreach (var a in await _audiencias.ListarPorRangoAsync(desde, hasta, idConciliador))
             {
-                id = $"aud-{a.IdDocumento}",
-                title = $"{a.NumeroExpediente} · sesión {a.NumeroSesion}",
-                start = inicio.ToString("yyyy-MM-dd'T'HH:mm:ss"),
-                end = a.Hora.HasValue ? inicio.AddHours(1).ToString("yyyy-MM-dd'T'HH:mm:ss") : null,
-                allDay = !a.Hora.HasValue,
-                url = Url.Action("Details", "Audiencias", new { id = a.IdDocumento }),
-                color = ColorAudiencia(a.Estado, a.Resultado),
-                extendedProps = new
-                {
-                    tipo = "audiencia",
-                    estado = a.Estado,
-                    resultado = a.Resultado,
-                    conciliador = a.Conciliador
-                }
-            });
-        }
-
-        if (vencimientos)
-        {
-            foreach (var v in await _audiencias.ListarVencimientosPorRangoAsync(desde, hasta, idConciliador))
-            {
+                var inicio = a.Fecha.Date + (a.Hora ?? TimeSpan.Zero);
                 eventos.Add(new
                 {
-                    id = $"venc-{v.IdExpediente}",
-                    title = $"Vence {v.NumeroExpediente}",
-                    start = v.FechaVencimiento.ToString("yyyy-MM-dd"),
-                    allDay = true,
-                    url = Url.Action("Details", "Expedientes", new { id = v.IdExpediente }),
-                    color = "#a4302f",
-                    extendedProps = new { tipo = "vencimiento", estado = v.EstadoProceso, resultado = (string?)null, conciliador = (string?)null }
+                    id = $"aud-{a.IdDocumento}",
+                    title = $"{a.NumeroExpediente} · sesión {a.NumeroSesion}",
+                    start = inicio.ToString("yyyy-MM-dd'T'HH:mm:ss"),
+                    end = a.Hora.HasValue ? inicio.AddHours(1).ToString("yyyy-MM-dd'T'HH:mm:ss") : null,
+                    allDay = !a.Hora.HasValue,
+                    url = Url.Action("Details", "Audiencias", new { id = a.IdDocumento }),
+                    color = ColorAudiencia(a.Estado, a.Resultado),
+                    extendedProps = new
+                    {
+                        tipo = "audiencia",
+                        estado = a.Estado,
+                        resultado = a.Resultado,
+                        conciliador = a.Conciliador
+                    }
                 });
+            }
+
+            if (vencimientos)
+            {
+                foreach (var v in await _audiencias.ListarVencimientosPorRangoAsync(desde, hasta, idConciliador))
+                {
+                    eventos.Add(new
+                    {
+                        id = $"venc-{v.IdExpediente}",
+                        title = $"Vence {v.NumeroExpediente}",
+                        start = v.FechaVencimiento.ToString("yyyy-MM-dd"),
+                        allDay = true,
+                        url = Url.Action("Details", "Expedientes", new { id = v.IdExpediente }),
+                        color = "#a4302f",
+                        extendedProps = new { tipo = "vencimiento", estado = v.EstadoProceso, resultado = (string?)null, conciliador = (string?)null }
+                    });
+                }
             }
         }
 
@@ -113,3 +117,4 @@ public class CalendarioController : Controller
         return "#0c3855";                                                           // programada
     }
 }
+
