@@ -1,3 +1,4 @@
+using Dapper;
 using SBSS.Conciliacion.Web.Data;
 using SBSS.Conciliacion.Web.Models;
 
@@ -19,9 +20,35 @@ public class ExpedienteRepository : IExpedienteRepository
                 numeroExpediente = vm.NumeroExpediente,
                 idTrabajador = vm.IdTrabajador,
                 idSede = vm.IdSede,
-                fechaRecepcion = vm.FechaRecepcion,
+                fechaRecepcion = DateTime.SpecifyKind(vm.FechaRecepcion, DateTimeKind.Unspecified),
                 plazoDias = vm.PlazoDias
             });
+    }
+
+    public async Task<int> InsertarComoConciliadorAsync(CrearExpedienteVm vm, int idConciliador)
+    {
+        using var conn = _factory.CreateConnection();
+        using var transaction = conn.BeginTransaction();
+
+        var idExpediente = await conn.ExecuteScalarAsync<int>(
+            "SELECT * FROM public.sp_expediente_insertar(p_numeroexpediente => @numeroExpediente, p_idtrabajador => @idTrabajador, p_idsede => @idSede, p_fecharecepcion => @fechaRecepcion, p_plazodias => @plazoDias)",
+            new
+            {
+                numeroExpediente = vm.NumeroExpediente,
+                idTrabajador = vm.IdTrabajador,
+                idSede = vm.IdSede,
+                fechaRecepcion = vm.FechaRecepcion,
+                plazoDias = vm.PlazoDias
+            }, transaction);
+
+        var filas = await conn.ExecuteAsync(
+            "UPDATE public.expediente SET idconciliador = @idConciliador, estadoproceso = 'ASIGNADO' WHERE idexpediente = @idExpediente",
+            new { idExpediente, idConciliador }, transaction);
+        if (filas != 1)
+            throw new InvalidOperationException("No se pudo asignar el expediente al conciliador actual.");
+
+        transaction.Commit();
+        return idExpediente;
     }
 
     public async Task<int> AsignarConciliadorAleatorioAsync(int idExpediente)
@@ -97,3 +124,4 @@ public class ExpedienteRepository : IExpedienteRepository
         await conn.ExecProcAsync("sp_Expediente_Eliminar", new { idExpediente });
     }
 }
+
