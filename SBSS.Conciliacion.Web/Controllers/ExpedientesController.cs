@@ -8,7 +8,7 @@ using SBSS.Conciliacion.Web.Services;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR,MESA_DE_PARTES")]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
 public class ExpedientesController : Controller
 {
     private readonly IExpedienteRepository _expedientes;
@@ -118,7 +118,7 @@ public class ExpedientesController : Controller
     }
 
     [HttpGet]
-    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR,MESA_DE_PARTES")]
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
     public async Task<IActionResult> Create()
     {
         await CargarCatalogosAsync();
@@ -132,7 +132,7 @@ public class ExpedientesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR,MESA_DE_PARTES")]
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
     public async Task<IActionResult> Create(CrearExpedienteVm vm)
     {
         if (!User.IsInRole("ADMINISTRADOR"))
@@ -152,12 +152,6 @@ public class ExpedientesController : Controller
         var idExpediente = User.IsInRole("CONCILIADOR")
             ? await _expedientes.InsertarComoConciliadorAsync(vm, IdTrabajadorActual())
             : await _expedientes.InsertarAsync(vm);
-
-        if (User.IsInRole("MESA_DE_PARTES"))
-        {
-            TempData["Ok"] = $"El expediente {vm.NumeroExpediente} quedó registrado y pendiente de asignación.";
-            return RedirectToAction(nameof(Create));
-        }
 
         TempData["Ok"] = "Expediente registrado correctamente.";
         return RedirectToAction(nameof(Details), new { id = idExpediente });
