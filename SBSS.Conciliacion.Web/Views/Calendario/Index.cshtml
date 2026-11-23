@@ -1,5 +1,6 @@
 @{
     ViewData["Title"] = "Calendario";
+    var esMesaDePartes = User.IsInRole("MESA_DE_PARTES");
 }
 
 @section Styles {
@@ -24,7 +25,14 @@
 
 <div class="wrap page-head">
     <h1>Calendario de audiencias</h1>
-    <p>Audiencias programadas y vencimientos de expedientes. Haz clic en un evento para abrirlo.</p>
+    @if (esMesaDePartes)
+    {
+        <p>Citas programadas de todos los conciliadores para consultar su disponibilidad.</p>
+    }
+    else
+    {
+        <p>Audiencias programadas y vencimientos de expedientes. Haz clic en un evento para abrirlo.</p>
+    }
 </div>
 
 <div class="wrap">
@@ -32,13 +40,24 @@
         <div class="alerta alerta-error" id="cal-error">No se pudo cargar el calendario. Recarga la página e inténtalo de nuevo.</div>
 
         <div class="cal-toolbar">
-            <label><input type="checkbox" id="chkSoloMias"> Solo mis audiencias</label>
-            <label><input type="checkbox" id="chkVencimientos" checked> Mostrar vencimientos</label>
+            @if (!esMesaDePartes)
+            {
+                <label><input type="checkbox" id="chkSoloMias"> Solo mis audiencias</label>
+                <label><input type="checkbox" id="chkVencimientos" checked> Mostrar vencimientos</label>
+            }
             <div class="cal-leyenda">
-                <span><i style="background:#0c3855"></i>Programada</span>
-                <span><i style="background:#b3893a"></i>Reprogramada</span>
-                <span><i style="background:#1f6b3a"></i>Con resultado</span>
-                <span><i style="background:#a4302f"></i>Vencimiento</span>
+                @if (esMesaDePartes)
+                {
+                    <span><i style="background:#b3893a"></i>Cita programada</span>
+                    <span><i style="background:#5b6a70"></i>Cita cancelada</span>
+                }
+                else
+                {
+                    <span><i style="background:#0c3855"></i>Programada</span>
+                    <span><i style="background:#b3893a"></i>Reprogramada</span>
+                    <span><i style="background:#1f6b3a"></i>Con resultado</span>
+                    <span><i style="background:#a4302f"></i>Vencimiento</span>
+                }
             </div>
         </div>
 
@@ -74,7 +93,7 @@
                 events: {
                     url: '@Url.Action("Eventos", "Calendario")',
                     extraParams: function () {
-                        return { soloMias: chkMias.checked, vencimientos: chkVenc.checked };
+                        return { soloMias: chkMias?.checked ?? false, vencimientos: chkVenc?.checked ?? false };
                     },
                     failure: function () { aviso.style.display = 'block'; }
                 },
@@ -90,8 +109,9 @@
             });
 
             calendar.render();
-            chkMias.addEventListener('change', function () { calendar.refetchEvents(); });
-            chkVenc.addEventListener('change', function () { calendar.refetchEvents(); });
+            chkMias?.addEventListener('change', function () { calendar.refetchEvents(); });
+            chkVenc?.addEventListener('change', function () { calendar.refetchEvents(); });
         })();
     </script>
 }
+
