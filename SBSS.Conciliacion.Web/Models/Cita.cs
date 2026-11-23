@@ -7,6 +7,7 @@ public class Cita
     public long IdCita { get; set; }
     public int? IdPersona { get; set; }
     public int? IdMateria { get; set; }
+    public string? NombreMateria { get; set; }
     public string NombreCliente { get; set; } = string.Empty;
     public string ApellidoPaterno { get; set; } = string.Empty;
     public string ApellidoMaterno { get; set; } = string.Empty;
