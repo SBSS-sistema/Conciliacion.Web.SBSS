@@ -9,4 +9,5 @@ public interface ITrabajadorRepository
     Task CambiarEstadoAsync(int idTrabajador, string estadoTrabajador);
     Task<Trabajador?> ObtenerPorIdAsync(int idTrabajador);
     Task<IEnumerable<Trabajador>> ListarAsync(int? idSedeRef = null, bool soloActivos = false);
+    Task<IEnumerable<Trabajador>> ListarConciliadoresActivosPorSedeAsync(int idSede);
 }
