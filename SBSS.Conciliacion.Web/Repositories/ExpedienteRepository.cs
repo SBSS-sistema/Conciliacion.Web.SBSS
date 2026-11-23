@@ -28,6 +28,8 @@ public class ExpedienteRepository : IExpedienteRepository
     public async Task<int> InsertarComoConciliadorAsync(CrearExpedienteVm vm, int idConciliador)
     {
         using var conn = _factory.CreateConnection();
+        // BeginTransaction exige la conexión abierta (Dapper solo la abre sola en consultas sin transacción).
+        conn.Open();
         using var transaction = conn.BeginTransaction();
 
         var idExpediente = await conn.ExecuteScalarAsync<int>(
@@ -37,7 +39,7 @@ public class ExpedienteRepository : IExpedienteRepository
                 numeroExpediente = vm.NumeroExpediente,
                 idTrabajador = vm.IdTrabajador,
                 idSede = vm.IdSede,
-                fechaRecepcion = vm.FechaRecepcion,
+                fechaRecepcion = DateTime.SpecifyKind(vm.FechaRecepcion, DateTimeKind.Unspecified),
                 plazoDias = vm.PlazoDias
             }, transaction);
 
@@ -60,6 +62,7 @@ public class ExpedienteRepository : IExpedienteRepository
     public async Task TrasladarAsync(TrasladarExpedienteVm vm, int idTrabajadorActor, bool esAdministrador)
     {
         using var conn = _factory.CreateConnection();
+        conn.Open();
         using var transaction = conn.BeginTransaction();
 
         var actual = await conn.QuerySingleOrDefaultAsync<ExpedienteAsignacionActual>("""
@@ -196,4 +199,3 @@ public class ExpedienteRepository : IExpedienteRepository
         await conn.ExecProcAsync("sp_Expediente_Eliminar", new { idExpediente });
     }
 }
-
