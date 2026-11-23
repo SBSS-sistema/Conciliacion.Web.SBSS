@@ -8,6 +8,7 @@ public interface IExpedienteRepository
 
     /// <summary>Asigna al azar un trabajador activo como conciliador y devuelve su idTrabajador.</summary>
     Task<int> AsignarConciliadorAleatorioAsync(int idExpediente);
+    Task<int> InsertarComoConciliadorAsync(CrearExpedienteVm vm, int idConciliador);
     Task CambiarEstadoAsync(int idExpediente, string nuevoEstado);
     Task<ExpedienteDetalleVm?> ObtenerPorIdAsync(int idExpediente);
     Task<IEnumerable<ExpedienteListItemVm>> ListarAsync(ExpedienteFiltroVm filtro);
@@ -15,3 +16,4 @@ public interface IExpedienteRepository
     Task AgregarMateriaAsync(AgregarMateriaExpedienteVm vm);
     Task EliminarAsync(int idExpediente);
 }
+
