@@ -15,19 +15,42 @@ public class UsuarioRepository : IUsuarioRepository
         using var conn = _factory.CreateConnection();
         // Solo trae el hash: la comparación se hace en la app (BCrypt).
         var porUsuario = await conn.QueryFirstOrDefaultProcAsync<UsuarioLogin>("sp_Usuario_ObtenerParaLogin", new { usuario });
-        if (porUsuario is not null) return porUsuario;
+        if (porUsuario is not null)
+        {
+            porUsuario.EmailTrabajador = await conn.QueryFirstOrDefaultAsync<string>(
+                "SELECT emailtrabajador FROM public.trabajador WHERE idtrabajador = @IdTrabajador;",
+                new { porUsuario.IdTrabajador });
+            return porUsuario;
+        }
 
         return await conn.QueryFirstOrDefaultAsync<UsuarioLogin>("""
             SELECT u.idusuario AS IdUsuario, u.usuario AS Usuario, u.contrasenia AS Contrasenia,
                    u.rol AS Rol, u.idtrabajador AS IdTrabajador,
                    t.nombretrabajador AS NombreTrabajador,
                    t.apepatertrabajador AS ApePaterTrabajador,
-                   t.estadotrabajador AS EstadoTrabajador
+                   t.estadotrabajador AS EstadoTrabajador,
+                   t.emailtrabajador AS EmailTrabajador
             FROM public.usuario u
             JOIN public.trabajador t ON t.idtrabajador = u.idtrabajador
             WHERE lower(t.emailtrabajador) = lower(@usuario)
             LIMIT 1;
             """, new { usuario });
+    }
+
+    public async Task<UsuarioLogin?> ObtenerParaAutenticacionAsync(int idUsuario)
+    {
+        using var conn = _factory.CreateConnection();
+        return await conn.QuerySingleOrDefaultAsync<UsuarioLogin>("""
+            SELECT u.idusuario AS IdUsuario, u.usuario AS Usuario, u.contrasenia AS Contrasenia,
+                   u.rol AS Rol, u.idtrabajador AS IdTrabajador,
+                   t.nombretrabajador AS NombreTrabajador,
+                   t.apepatertrabajador AS ApePaterTrabajador,
+                   t.estadotrabajador AS EstadoTrabajador,
+                   t.emailtrabajador AS EmailTrabajador
+            FROM public.usuario u
+            JOIN public.trabajador t ON t.idtrabajador = u.idtrabajador
+            WHERE u.idusuario = @IdUsuario;
+            """, new { idUsuario });
     }
 
     public async Task<string?> ObtenerRolActivoAsync(int idUsuario)
