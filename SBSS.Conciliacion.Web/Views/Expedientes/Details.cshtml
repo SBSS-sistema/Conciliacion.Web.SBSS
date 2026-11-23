@@ -4,6 +4,7 @@
     var e = Model.Expediente;
     var personas = ViewBag.Personas as List<PersonaListItem> ?? new();
     var materias = ViewBag.Materias as List<Materia> ?? new();
+    var puedeVincularPersona = User.IsInRole("ADMINISTRADOR") || User.IsInRole("CONCILIADOR");
 }
 
 <div class="wrap page-head" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;">
@@ -209,7 +210,7 @@
                 </div>
             }
 
-            @if (User.IsInRole("ADMINISTRADOR"))
+            @if (puedeVincularPersona)
             {
             <form asp-action="AgregarPersona" method="post" class="form-sbss" style="margin-top:16px;border-top:1px solid rgba(12,56,85,0.08);padding-top:16px;">
                 <input type="hidden" name="IdExpediente" value="@e.IdExpediente" />
@@ -230,7 +231,10 @@
                 </select>
                 <button type="submit" class="btn btn-ghost" style="width:100%;">Vincular persona</button>
             </form>
-            <a asp-controller="Personas" asp-action="CreateNatural" style="display:block;text-align:center;margin-top:10px;font-size:0.85rem;color:var(--navy);text-decoration:underline;">¿La persona no existe? Regístrala aquí</a>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;">
+                <a asp-controller="Personas" asp-action="CreateNatural" class="btn btn-ghost" style="flex:1;text-align:center;">Registrar persona natural</a>
+                <a asp-controller="Personas" asp-action="CreateJuridica" class="btn btn-ghost" style="flex:1;text-align:center;">Registrar persona jurídica</a>
+            </div>
             }
         </div>
     </div>
