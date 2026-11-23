@@ -5,7 +5,7 @@ using SBSS.Conciliacion.Web.Repositories;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize(Roles = "ADMINISTRADOR,MESA_DE_PARTES")]
+[Authorize(Roles = "ADMINISTRADOR,MESA_DE_PARTES,CONCILIADOR")]
 public class SedesController : Controller
 {
     private readonly ISedeRepository _sedes;
