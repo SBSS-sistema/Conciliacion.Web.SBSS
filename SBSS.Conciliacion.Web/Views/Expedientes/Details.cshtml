@@ -64,9 +64,15 @@
                 @if (!materias.Any())
                 {
                     <p style="color:#a4302f;font-size:0.85rem;margin-bottom:10px;">
-                        No hay materias registradas todavía. Ve a
-                        <a asp-controller="Materias" asp-action="Create" style="text-decoration:underline;">Catálogos → Materias</a>
-                        para crear al menos una antes de poder vincularla aquí.
+                        No hay materias registradas todavía.
+                        @if (User.IsInRole("ADMINISTRADOR"))
+                        {
+                            <span>Ve a <a asp-controller="Materias" asp-action="Create" style="text-decoration:underline;">Materias</a> para agregar una.</span>
+                        }
+                        else
+                        {
+                            <span>Solicita al administrador que agregue las materias necesarias.</span>
+                        }
                     </p>
                 }
                 <select name="IdMateria" class="form-control">
@@ -229,3 +235,4 @@
         </div>
     </div>
 </div>
+
