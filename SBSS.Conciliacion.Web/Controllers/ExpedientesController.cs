@@ -8,7 +8,7 @@ using SBSS.Conciliacion.Web.Services;
 
 namespace SBSS.Conciliacion.Web.Controllers;
 
-[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
+[Authorize(Roles = "ADMINISTRADOR,CONCILIADOR,MESA_DE_PARTES")]
 public class ExpedientesController : Controller
 {
     private readonly IExpedienteRepository _expedientes;
@@ -53,6 +53,7 @@ public class ExpedientesController : Controller
     }
 
  
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
     public async Task<IActionResult> Index(ExpedienteFiltroVm filtro)
     {
         if (User.IsInRole("CONCILIADOR"))
@@ -101,6 +102,7 @@ public class ExpedientesController : Controller
     }
 
 
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
     public async Task<IActionResult> Details(int id)
     {
         var detalle = await _expedientes.ObtenerPorIdAsync(id);
@@ -116,25 +118,47 @@ public class ExpedientesController : Controller
     }
 
     [HttpGet]
-    [Authorize(Roles = "ADMINISTRADOR")]
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR,MESA_DE_PARTES")]
     public async Task<IActionResult> Create()
     {
         await CargarCatalogosAsync();
-        return View(new CrearExpedienteVm { FechaRecepcion = DateTime.Today, PlazoDias = 30 });
+        return View(new CrearExpedienteVm
+        {
+            FechaRecepcion = DateTime.Today,
+            PlazoDias = 30,
+            IdTrabajador = User.IsInRole("ADMINISTRADOR") ? 0 : IdTrabajadorActual()
+        });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "ADMINISTRADOR")]
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR,MESA_DE_PARTES")]
     public async Task<IActionResult> Create(CrearExpedienteVm vm)
     {
+        if (!User.IsInRole("ADMINISTRADOR"))
+        {
+            var idTrabajadorActual = IdTrabajadorActual();
+            if (idTrabajadorActual <= 0) return Forbid();
+            // Evita que un POST manipulado registre el expediente a nombre de otro trabajador.
+            vm.IdTrabajador = idTrabajadorActual;
+        }
+
         if (!ModelState.IsValid)
         {
             await CargarCatalogosAsync();
             return View(vm);
         }
 
-        var idExpediente = await _expedientes.InsertarAsync(vm);
+        var idExpediente = User.IsInRole("CONCILIADOR")
+            ? await _expedientes.InsertarComoConciliadorAsync(vm, IdTrabajadorActual())
+            : await _expedientes.InsertarAsync(vm);
+
+        if (User.IsInRole("MESA_DE_PARTES"))
+        {
+            TempData["Ok"] = $"El expediente {vm.NumeroExpediente} quedó registrado y pendiente de asignación.";
+            return RedirectToAction(nameof(Create));
+        }
+
         TempData["Ok"] = "Expediente registrado correctamente.";
         return RedirectToAction(nameof(Details), new { id = idExpediente });
     }
@@ -174,6 +198,7 @@ public class ExpedientesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
     public async Task<IActionResult> CambiarEstado(CambiarEstadoVm vm)
     {
         if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
@@ -202,6 +227,7 @@ public class ExpedientesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
     public async Task<IActionResult> AgregarMateria(AgregarMateriaExpedienteVm vm)
     {
         if (!await PuedeAccederExpedienteAsync(vm.IdExpediente)) return Forbid();
@@ -228,6 +254,7 @@ public class ExpedientesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
     [RequestSizeLimit(200L * 1024 * 1024)]
     public async Task<IActionResult> SubirArchivo(SubirArchivoVm vm)
     {
@@ -253,6 +280,7 @@ public class ExpedientesController : Controller
         return RedirectToAction(nameof(Details), new { id = vm.IdExpediente });
     }
 
+    [Authorize(Roles = "ADMINISTRADOR,CONCILIADOR")]
     public async Task<IActionResult> DescargarArchivo(int id)
     {
         var archivo = await _documentos.ObtenerArchivoPorIdAsync(id);
@@ -290,7 +318,17 @@ public class ExpedientesController : Controller
     private async Task CargarCatalogosAsync()
     {
         ViewBag.Sedes = (await _sedes.ListarAsync(soloActivas: true)).ToList();
-        ViewBag.Trabajadores = (await _trabajadores.ListarAsync(soloActivos: true)).ToList();
+        if (User.IsInRole("ADMINISTRADOR"))
+        {
+            ViewBag.Trabajadores = (await _trabajadores.ListarAsync(soloActivos: true)).ToList();
+            ViewBag.TrabajadorActual = null;
+        }
+        else
+        {
+            var propio = await _trabajadores.ObtenerPorIdAsync(IdTrabajadorActual());
+            ViewBag.Trabajadores = propio is null ? new List<Trabajador>() : new List<Trabajador> { propio };
+            ViewBag.TrabajadorActual = propio;
+        }
     }
 
     private int IdTrabajadorActual() => int.Parse(User.FindFirstValue("idTrabajador") ?? "0");
@@ -302,3 +340,4 @@ public class ExpedientesController : Controller
         return User.IsInRole("CONCILIADOR") && detalle?.Expediente.IdConciliador == IdTrabajadorActual();
     }
 }
+
